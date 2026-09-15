@@ -6,3 +6,5 @@ __pycache__/
 .idea/
 data/raw_matlab/*.mat
 *.slxc
+.venv/
+.council/

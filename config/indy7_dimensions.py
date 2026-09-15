@@ -1,60 +1,95 @@
-"""
-Indy7 Kinematic Dimensions & Physical Parameters Specification
-CAD 도면 및 URDF 명세 기반 치수 정의 (Zero-Magic-Number)
-"""
-
 from dataclasses import dataclass
+from typing import List
 import numpy as np
 
+# 3차원 6방향 단위벡터 및 영벡터
+X_POS = np.array([ 1.,  0.,  0.])
+X_NEG = np.array([-1.,  0.,  0.])
+Y_POS = np.array([ 0.,  1.,  0.])
+Y_NEG = np.array([ 0., -1.,  0.])
+Z_POS = np.array([ 0.,  0.,  1.])
+Z_NEG = np.array([ 0.,  0., -1.])
+ZERO  = np.array([ 0.,  0.,  0.])
 
-@dataclass
-class Indy7Geometry:
-    """
-    Indy7 6축 협동로봇의 CAD 도면 기반 기하학적 치수 파라미터.
-    치수가 변경되거나 추가 엔드이펙터(그리퍼 등)를 장착할 때 이 파라미터만 수정하면 됩니다.
-    """
-    # 1. 고정 회전 상수 (URDF xacro pi/2)
-    h: float = 1.570796327
+H = 1.570796327  # 90deg (rad)
 
-    # 2. 베이스 및 링크 기하 치수 (단위: m)
-    h_base1: float = 0.0775      # Joint 1 높이 (베이스 바닥 ~ 1번 축 모터)
-    d_shoulder: float = -0.109   # Joint 2 숄더 좌우 편심 오프셋
-    h_base2: float = 0.222       # Joint 2 숄더 수직 높이
-    l_arm1: float = -0.450       # [가변] Link 2 상완 길이 (2번축 ~ 3번축)
-    d_elbow: float = -0.0305     # Joint 3 엘보우 축 오프셋
-    l_arm2: float = -0.267       # [가변] Link 3 하완 길이 (3번축 ~ 4번축)
-    d_wrist1: float = -0.075     # Joint 4 손목 오프셋 1
-    d_wrist2: float = -0.114     # Joint 5 손목 오프셋 2
-    h_wrist: float = 0.083       # Joint 5 손목 높이
-    l_flange: float = -0.168     # Joint 6 플랜지 링크 오프셋
-    h_flange: float = 0.069      # Joint 6 플랜지 높이
 
-    # 3. 툴(엔드이펙터) 오프셋 (기본 60mm)
-    l_tcp: float = 0.060         # [가변] 6번 축 플랜지 면 ~ TCP 끝단 거리
+@dataclass(frozen=True)
+class Joint:
 
-    def get_rpy_matrix(self) -> np.ndarray:
-        """관절 간 고정 RPY 회전각 (rad)"""
-        h = self.h
-        return np.array([
-            [ 0.0,  0.0,  0.0],
-            [   h,    h,  0.0],
-            [ 0.0,  0.0,  0.0],
-            [  -h,  0.0,    h],
-            [   h,    h,  0.0],
-            [  -h,  0.0,    h]
-        ])
+    #조인트 기하학 파라미터
+    #- len_val, len_dir   : 주 링크 길이(m) 및 방향 단위벡터
+    #- off_val, off_dir   : 관절 편심 단차(m) 및 방향 단위벡터
+    #- rpy                : 조립 방위각 (roll, pitch, yaw)
+    #- axis               : 회전축 단위벡터
+    #- sign               : 모터 엔코더 회전 부호 (+1 또는 -1)
+    
+    name: str
+    len_val: float
+    len_dir: np.ndarray
+    off_val: float
+    off_dir: np.ndarray
+    rpy: np.ndarray
+    axis: np.ndarray = Z_POS
+    sign: int = 1
 
-    def get_xyz_matrix(self) -> np.ndarray:
-        """관절 간 고정 XYZ 변위 오프셋 (m)"""
-        return np.array([
-            [ 0.0,           0.0,             self.h_base1 ],
-            [ 0.0,           self.d_shoulder, self.h_base2 ],
-            [ self.l_arm1,   0.0,             self.d_elbow ],
-            [ self.l_arm2,   0.0,             self.d_wrist1],
-            [ 0.0,           self.d_wrist2,   self.h_wrist ],
-            [ self.l_flange, 0.0,             self.h_flange]
-        ])
+    @property
+    def origin(self) -> np.ndarray:
+        #길이와 단차 벡터를 더해서 3차원 상대 위치(XYZ) 반환
+        return self.len_val * self.len_dir + self.off_val * self.off_dir
 
-    def get_tcp_xyz(self) -> np.ndarray:
-        """플랜지 좌표계 기준 TCP 끝단 오프셋"""
-        return np.array([0.0, 0.0, self.l_tcp])
+# Indy7 파라미터 (base, link1 ~ link6, tcp)
+INDY7_JOINTS = [
+    # Joint 0: Joint0(base) -> link1
+    Joint(
+        name="joint0",
+        len_val=0.0775, len_dir=Z_POS,
+        off_val=0.0,    off_dir=ZERO,
+        rpy=np.array([0., 0., 0.]),
+        axis=Z_POS, sign=1
+    ),
+    # Joint 1: link1 -> link2
+    Joint(
+        name="joint1",
+        len_val=0.2220, len_dir=Z_POS,
+        off_val=0.1090, off_dir=Y_NEG,
+        rpy=np.array([H, H, 0.]),
+        axis=Z_POS, sign=1
+    ),
+    # Joint 2: link2 -> link3
+    Joint(
+        name="joint2",
+        len_val=0.4500, len_dir=X_NEG,
+        off_val=0.0305, off_dir=Z_NEG,
+        rpy=np.array([0., 0., 0.]),
+        axis=Z_POS, sign=1
+    ),
+    # Joint 3: link3 -> link4
+    Joint(
+        name="joint3",
+        len_val=0.2670, len_dir=X_NEG,
+        off_val=0.0750, off_dir=Z_NEG,
+        rpy=np.array([-H, 0., H]),
+        axis=Z_POS, sign=1
+    ),
+    # Joint 4: link4 -> link5
+    Joint(
+        name="joint4",
+        len_val=0.0830, len_dir=Z_POS,
+        off_val=0.1140, off_dir=Y_NEG,
+        rpy=np.array([H, H, 0.]),
+        axis=Z_POS, sign=1
+    ),
+    # Joint 5: link5 -> link6
+    Joint(
+        name="joint5",
+        len_val=0.1680, len_dir=X_NEG,
+        off_val=0.0690, off_dir=Z_POS,
+        rpy=np.array([-H, 0., H]),
+        axis=Z_POS, sign=1
+    ),
+]
+
+# Link 6 -> TCP (고정 툴)
+TCP_OFFSET = 0.0600  # 60 mm
+TCP_DIR = Z_POS
