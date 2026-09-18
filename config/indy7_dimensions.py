@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import List
 import numpy as np
 
@@ -30,7 +30,7 @@ class Joint:
     off_val: float
     off_dir: np.ndarray
     rpy: np.ndarray
-    axis: np.ndarray = Z_POS
+    axis: np.ndarray = field(default_factory=lambda: Z_POS.copy())
     sign: int = 1
 
     @property

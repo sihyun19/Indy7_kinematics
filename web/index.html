@@ -1,0 +1,31 @@
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>Indy7 3D Kinematics Viewer</title>
+    <style>
+    body { margin: 0; overflow: hidden; font-family: sans-serif; }
+    #canvas-container { width: 100vw; height: 100vh; }
+    #ui-panel {
+    position: absolute; top: 20px; right: 20px;
+    width: 280px; background: rgba(255, 255, 255, 0.9);
+    padding: 15px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+    }
+    </style>
+    <!-- Three.js 및 필수 부가 라이브러리 CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/STLLoader.js"></script>
+</head>
+<body>
+    <div id="canvas-container"></div>
+    <div id="ui-panel">
+      <h3>Indy7 Joint Control</h3>
+        <!-- 6개 조인트 슬라이더 (q0 ~ q5) -->
+        <!-- 실시간 TCP 위치 (X, Y, Z) 및 자세 표시 패널 -->
+        <!-- Home Pose 리셋 버튼 및 Dance 궤적 재생 버튼 -->
+    </div>
+    <script src="viewer.js"></script>
+</body>
+</html>
