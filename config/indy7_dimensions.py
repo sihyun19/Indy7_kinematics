@@ -40,50 +40,50 @@ class Joint:
 
 # Indy7 파라미터 (base, link1 ~ link6, tcp)
 INDY7_JOINTS = [
-    # Joint 0: Joint0(base) -> link1
+    # Joint 1: base -> link1
     Joint(
-        name="joint0",
-        len_val=0.0775, len_dir=Z_POS,
+        name="joint1",
+        len_val=0.000, len_dir=Z_POS, #베이스 위치 정보
         off_val=0.0,    off_dir=ZERO,
         rpy=np.array([0., 0., 0.]),
         axis=Z_POS, sign=1
     ),
-    # Joint 1: link1 -> link2
+    # Joint 2: link1 -> link2
     Joint(
-        name="joint1",
-        len_val=0.2220, len_dir=Z_POS,
+        name="joint2",
+        len_val=0.3000, len_dir=Z_POS, #link1 길이
         off_val=0.1090, off_dir=Y_NEG,
         rpy=np.array([H, H, 0.]),
         axis=Z_POS, sign=1
     ),
-    # Joint 2: link2 -> link3
+    # Joint 3: link2 -> link3
     Joint(
-        name="joint2",
-        len_val=0.4500, len_dir=X_NEG,
+        name="joint3",
+        len_val=0.4500, len_dir=X_NEG, #link2 길이
         off_val=0.0305, off_dir=Z_NEG,
         rpy=np.array([0., 0., 0.]),
         axis=Z_POS, sign=1
     ),
-    # Joint 3: link3 -> link4
+    # Joint 4: link3 -> link4
     Joint(
-        name="joint3",
-        len_val=0.2670, len_dir=X_NEG,
+        name="joint4",
+        len_val=0.2670, len_dir=X_NEG, #link3 길이
         off_val=0.0750, off_dir=Z_NEG,
         rpy=np.array([-H, 0., H]),
         axis=Z_POS, sign=1
     ),
-    # Joint 4: link4 -> link5
+    # Joint 5: link4 -> link5
     Joint(
-        name="joint4",
-        len_val=0.0830, len_dir=Z_POS,
+        name="joint5",
+        len_val=0.0830, len_dir=Z_POS, #link4 길이
         off_val=0.1140, off_dir=Y_NEG,
         rpy=np.array([H, H, 0.]),
         axis=Z_POS, sign=1
     ),
-    # Joint 5: link5 -> link6
+    # Joint 6: link5 -> link6
     Joint(
-        name="joint5",
-        len_val=0.1680, len_dir=X_NEG,
+        name="joint6",
+        len_val=0.1680, len_dir=X_NEG, #link5 길이
         off_val=0.0690, off_dir=Z_POS,
         rpy=np.array([-H, 0., H]),
         axis=Z_POS, sign=1

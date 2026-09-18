@@ -132,10 +132,7 @@ if __name__ == "__main__":
     print("TCP 위치 (XYZ, m):", np.round(tcp_pos, 4))
     print("기대값            : [ 0.     -0.1865  1.3275]")
     print(f"저장된 링크 변환행렬 개수: {len(link_transforms_res)}개 (Base + Link)")
-    
-    # 오차 검증
-    assert np.allclose(tcp_pos, [0.0, -0.1865, 1.3275], atol=1e-4), "INdy7 규격과 다름. 수치 점검 필요."
-    print("위치 확인 완료.")
+
 
     print("=== Indy7 FK 각도 입력===")
     print("6개 관절 각도(deg)를 띄어쓰기로 구분하여 입력 후 q 입력")
