@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -6,54 +5,169 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Indy7 3D Kinematics Viewer</title>
     <style>
-        * { box-sizing: border-box; }
-        body { margin: 0; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #1e1e24; color: #333; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+            background-color: #ffffff;
+            color: #000000;
+        }
         #canvas-container { width: 100vw; height: 100vh; position: absolute; top: 0; left: 0; }
         #ui-panel {
-            position: absolute; top: 20px; right: 20px;
-            width: 320px; max-height: calc(100vh - 40px); overflow-y: auto;
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
-            padding: 18px; border-radius: 12px;
-            box-shadow: 0 8px 24px rgba(0,0,0,0.18);
-            font-size: 13px;
+            position: absolute; top: 16px; right: 16px;
+            width: 320px; max-height: calc(100vh - 32px); overflow-y: auto;
+            background: #ffffff;
+            border: 1px solid #000000;
+            border-radius: 8px;
+            padding: 14px;
+            font-size: 12px;
+            color: #000000;
+            font-family: Arial, sans-serif;
         }
-        .header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px; }
-        .header-row h3 { margin: 0; font-size: 16px; color: #1a202c; }
-        .status-badge {
-            font-size: 11px; padding: 2px 8px; border-radius: 12px;
-            background: #feebc8; color: #c05621; font-weight: 600;
+        #joint-controls {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin-bottom: 12px;
         }
-        .status-badge.ready { background: #c6f6d5; color: #22543d; }
-        .joint-group { margin-bottom: 10px; }
-        .joint-header { display: flex; justify-content: space-between; font-weight: 600; margin-bottom: 2px; color: #4a5568; }
+        .joint-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            height: 26px;
+        }
+        .joint-label {
+            width: 22px;
+            font-family: Arial, sans-serif;
+            font-weight: bold;
+            color: #000000;
+            font-size: 12px;
+            flex-shrink: 0;
+        }
         .joint-slider {
-            width: 100%; -webkit-appearance: none; appearance: none;
-            height: 6px; border-radius: 3px; background: #e2e8f0; outline: none;
+            flex: 1;
+            -webkit-appearance: none;
+            appearance: none;
+            height: 4px;
+            border-radius: 2px;
+            background: #d4d4d8;
+            outline: none;
+            cursor: pointer;
         }
         .joint-slider::-webkit-slider-thumb {
-            -webkit-appearance: none; appearance: none;
-            width: 16px; height: 16px; border-radius: 50%;
-            background: #3182ce; cursor: pointer; transition: transform 0.1s;
+            -webkit-appearance: none;
+            appearance: none;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #000000;
+            cursor: pointer;
+            transition: transform 0.1s;
         }
-        .joint-slider::-webkit-slider-thumb:hover { transform: scale(1.2); }
-        .btn-group { display: flex; gap: 8px; margin: 14px 0; }
+        .joint-slider::-webkit-slider-thumb:hover {
+            transform: scale(1.25);
+        }
+        .joint-input-container {
+            display: flex;
+            align-items: center;
+            gap: 2px;
+            flex-shrink: 0;
+        }
+        .joint-input {
+            width: 58px;
+            height: 24px;
+            padding: 2px 4px;
+            border: 1px solid #71717a;
+            border-radius: 4px;
+            font-family: Arial, sans-serif;
+            font-size: 11px;
+            text-align: right;
+            outline: none;
+            color: #000000;
+            font-weight: bold;
+            background: #ffffff;
+        }
+        .joint-input:focus {
+            border-color: #000000;
+        }
+        .joint-unit {
+            font-size: 11px;
+            color: #000000;
+            font-weight: bold;
+            width: 8px;
+        }
+        .btn-group {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 12px;
+        }
         .btn {
-            flex: 1; padding: 8px 10px; border: none; border-radius: 6px;
-            cursor: pointer; font-size: 12px; font-weight: 600;
-            transition: background 0.15s;
+            flex: 1;
+            height: 28px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 11px;
+            font-weight: bold;
+            letter-spacing: 0.2px;
+            font-family: Arial, sans-serif;
+            transition: all 0.15s;
         }
-        .btn-primary { background: #3182ce; color: #fff; }
-        .btn-primary:hover { background: #2b6cb0; }
-        .btn-secondary { background: #edf2f7; color: #4a5568; }
-        .btn-secondary:hover { background: #e2e8f0; }
-        .info-card {
-            background: #f7fafc; border: 1px solid #e2e8f0;
-            border-radius: 8px; padding: 10px; margin-top: 10px;
+        .btn-primary {
+            background: #000000;
+            color: #ffffff;
+            border: 1px solid #000000;
         }
-        .info-title { font-weight: 700; color: #2d3748; margin-bottom: 6px; font-size: 12px; }
-        .info-row { display: flex; justify-content: space-between; font-family: Consolas, monospace; font-size: 12px; color: #4a5568; margin-bottom: 3px; }
-        .info-val { font-weight: 600; color: #2b6cb0; }
+        .btn-primary:hover {
+            background: #27272a;
+        }
+        .btn-secondary {
+            background: #ffffff;
+            color: #000000;
+            border: 1px solid #000000;
+        }
+        .btn-secondary:hover {
+            background: #f4f4f5;
+        }
+        .pose-container {
+            display: flex;
+            gap: 8px;
+        }
+        .pose-box {
+            flex: 1;
+            background: #ffffff;
+            border: 1px solid #000000;
+            border-radius: 6px;
+            padding: 8px 10px;
+        }
+        .box-title {
+            font-size: 11px;
+            color: #000000;
+            font-weight: bold;
+            letter-spacing: 0.3px;
+            padding-bottom: 4px;
+            border-bottom: 1px solid #000000;
+            margin-bottom: 6px;
+        }
+        .pose-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-family: Arial, sans-serif;
+            font-size: 11px;
+            margin-bottom: 3px;
+        }
+        .pose-row:last-child {
+            margin-bottom: 0;
+        }
+        .axis-label {
+            color: #000000;
+            font-weight: bold;
+        }
+        .num-val {
+            color: #000000;
+            font-weight: bold;
+            font-variant-numeric: tabular-nums;
+        }
     </style>
     <!-- Three.js 및 필수 부가 라이브러리 CDN -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -63,36 +177,54 @@
 <body>
     <div id="canvas-container"></div>
     <div id="ui-panel">
-        <div class="header-row">
-            <h3>Indy7 Kinematics</h3>
-            <span id="status-badge" class="status-badge">로딩 중...</span>
-        </div>
-
         <div id="joint-controls">
-            <!-- 6개 조인트 슬라이더 -->
-            <div class="joint-group">
-                <div class="joint-header"><span>J1 (Base 회전)</span><span id="val-q0">0.0°</span></div>
+            <div class="joint-row">
+                <span class="joint-label">J1</span>
                 <input type="range" class="joint-slider" id="slider-q0" min="-175" max="175" step="0.5" value="0">
+                <div class="joint-input-container">
+                    <input type="number" class="joint-input" id="input-q0" min="-175" max="175" step="0.5" value="0.0">
+                    <span class="joint-unit">°</span>
+                </div>
             </div>
-            <div class="joint-group">
-                <div class="joint-header"><span>J2 (어깨)</span><span id="val-q1">0.0°</span></div>
+            <div class="joint-row">
+                <span class="joint-label">J2</span>
                 <input type="range" class="joint-slider" id="slider-q1" min="-175" max="175" step="0.5" value="0">
+                <div class="joint-input-container">
+                    <input type="number" class="joint-input" id="input-q1" min="-175" max="175" step="0.5" value="0.0">
+                    <span class="joint-unit">°</span>
+                </div>
             </div>
-            <div class="joint-group">
-                <div class="joint-header"><span>J3 (팔꿈치)</span><span id="val-q2">0.0°</span></div>
+            <div class="joint-row">
+                <span class="joint-label">J3</span>
                 <input type="range" class="joint-slider" id="slider-q2" min="-175" max="175" step="0.5" value="0">
+                <div class="joint-input-container">
+                    <input type="number" class="joint-input" id="input-q2" min="-175" max="175" step="0.5" value="0.0">
+                    <span class="joint-unit">°</span>
+                </div>
             </div>
-            <div class="joint-group">
-                <div class="joint-header"><span>J4 (손목 피치 1)</span><span id="val-q3">0.0°</span></div>
+            <div class="joint-row">
+                <span class="joint-label">J4</span>
                 <input type="range" class="joint-slider" id="slider-q3" min="-175" max="175" step="0.5" value="0">
+                <div class="joint-input-container">
+                    <input type="number" class="joint-input" id="input-q3" min="-175" max="175" step="0.5" value="0.0">
+                    <span class="joint-unit">°</span>
+                </div>
             </div>
-            <div class="joint-group">
-                <div class="joint-header"><span>J5 (손목 피치 2)</span><span id="val-q4">0.0°</span></div>
+            <div class="joint-row">
+                <span class="joint-label">J5</span>
                 <input type="range" class="joint-slider" id="slider-q4" min="-175" max="175" step="0.5" value="0">
+                <div class="joint-input-container">
+                    <input type="number" class="joint-input" id="input-q4" min="-175" max="175" step="0.5" value="0.0">
+                    <span class="joint-unit">°</span>
+                </div>
             </div>
-            <div class="joint-group">
-                <div class="joint-header"><span>J6 (툴 롤)</span><span id="val-q5">0.0°</span></div>
+            <div class="joint-row">
+                <span class="joint-label">J6</span>
                 <input type="range" class="joint-slider" id="slider-q5" min="-215" max="215" step="0.5" value="0">
+                <div class="joint-input-container">
+                    <input type="number" class="joint-input" id="input-q5" min="-215" max="215" step="0.5" value="0.0">
+                    <span class="joint-unit">°</span>
+                </div>
             </div>
         </div>
 
@@ -101,18 +233,20 @@
             <button id="btn-test" class="btn btn-secondary">Test Pose</button>
         </div>
 
-        <div class="info-card">
-            <div class="info-title">TCP 위치 (XYZ, mm)</div>
-            <div class="info-row"><span>X:</span><span id="tcp-x" class="info-val">0.0</span></div>
-            <div class="info-row"><span>Y:</span><span id="tcp-y" class="info-val">-186.5</span></div>
-            <div class="info-row"><span>Z:</span><span id="tcp-z" class="info-val">1328.0</span></div>
-        </div>
+        <div class="pose-container">
+            <div class="pose-box">
+                <div class="box-title">Position (mm)</div>
+                <div class="pose-row"><span class="axis-label">X</span><span id="tcp-x" class="num-val">0.0</span></div>
+                <div class="pose-row"><span class="axis-label">Y</span><span id="tcp-y" class="num-val">-186.5</span></div>
+                <div class="pose-row"><span class="axis-label">Z</span><span id="tcp-z" class="num-val">1328.0</span></div>
+            </div>
 
-        <div class="info-card">
-            <div class="info-title">TCP 자세 (RPY, deg)</div>
-            <div class="info-row"><span>Roll:</span><span id="tcp-roll" class="info-val">0.0°</span></div>
-            <div class="info-row"><span>Pitch:</span><span id="tcp-pitch" class="info-val">0.0°</span></div>
-            <div class="info-row"><span>Yaw:</span><span id="tcp-yaw" class="info-val">0.0°</span></div>
+            <div class="pose-box">
+                <div class="box-title">Rotation (deg)</div>
+                <div class="pose-row"><span class="axis-label">Roll</span><span id="tcp-roll" class="num-val">0.0°</span></div>
+                <div class="pose-row"><span class="axis-label">Pitch</span><span id="tcp-pitch" class="num-val">0.0°</span></div>
+                <div class="pose-row"><span class="axis-label">Yaw</span><span id="tcp-yaw" class="num-val">0.0°</span></div>
+            </div>
         </div>
     </div>
     <script src="viewer.js"></script>

@@ -21,7 +21,7 @@ function init() {
 
     // 씬 생성
     scene = new THREE.Scene();
-    scene.background = new THREE.Color(0xf5f7fb);
+    scene.background = new THREE.Color(0xffffff);
 
     // 카메라 생성 (Z-Up 좌표계)
     camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.01, 50.0);
@@ -54,12 +54,12 @@ function init() {
     dirLight1.shadow.mapSize.height = 1024;
     scene.add(dirLight1);
 
-    const dirLight2 = new THREE.DirectionalLight(0xb0c4de, 0.35);
+    const dirLight2 = new THREE.DirectionalLight(0xffffff, 0.35);
     dirLight2.position.set(-3, 4, 3);
     scene.add(dirLight2);
 
     // 그리드 생성 (Z-Up 기준 XY 평면)
-    const gridHelper = new THREE.GridHelper(3.0, 30, 0x4a5568, 0xd2d6dc);
+    const gridHelper = new THREE.GridHelper(3.0, 30, 0x71717a, 0xe4e4e7);
     gridHelper.rotation.x = Math.PI / 2;
     gridHelper.position.set(0, 0, -0.001);
     scene.add(gridHelper);
@@ -80,21 +80,10 @@ function init() {
     // 메쉬 로드 및 초기 포즈 설정
     loadRobotMeshes()
         .then(() => {
-            const badge = document.getElementById('status-badge');
-            if (badge) {
-                badge.innerText = '준비 완료';
-                badge.classList.add('ready');
-            }
             requestRobotPose([0, 0, 0, 0, 0, 0]);
         })
         .catch((err) => {
             console.error('메쉬 로드 실패:', err);
-            const badge = document.getElementById('status-badge');
-            if (badge) {
-                badge.innerText = '로드 오류';
-                badge.style.background = '#fed7d7';
-                badge.style.color = '#9b2c2c';
-            }
         });
 
     animate();
@@ -102,8 +91,6 @@ function init() {
 
 function loadRobotMeshes() {
     const loader = new THREE.STLLoader();
-    const badge = document.getElementById('status-badge');
-    let loadedCount = 0;
 
     const promises = STL_PATHS.map((path, idx) => {
         return new Promise((resolve, reject) => {
@@ -128,11 +115,6 @@ function loadRobotMeshes() {
 
                     scene.add(mesh);
                     linkMeshes[idx] = mesh;
-
-                    loadedCount++;
-                    if (badge) {
-                        badge.innerText = `로딩 중 (${loadedCount}/7)`;
-                    }
                     resolve();
                 },
                 undefined,
@@ -150,14 +132,35 @@ function loadRobotMeshes() {
 function setupUIEventListeners() {
     for (let i = 0; i < 6; i++) {
         const slider = document.getElementById(`slider-q${i}`);
-        const valText = document.getElementById(`val-q${i}`);
-        if (!slider) continue;
+        const input = document.getElementById(`input-q${i}`);
+        if (!slider || !input) continue;
 
+        // 1. 스크롤 바(슬라이더) 드래그 시 숫자 입력창 동기화 및 3D 갱신
         slider.addEventListener('input', () => {
-            if (valText) {
-                valText.innerText = `${parseFloat(slider.value).toFixed(1)}°`;
+            const val = parseFloat(slider.value) || 0.0;
+            input.value = val.toFixed(1);
+            onAngleChanged();
+        });
+
+        // 2. 각도 직접 입력창 값 타이핑 시 슬라이더 동기화 및 3D 갱신
+        input.addEventListener('input', () => {
+            const val = parseFloat(input.value);
+            if (!isNaN(val)) {
+                slider.value = val;
+                onAngleChanged();
             }
-            onSliderChanged();
+        });
+
+        // 입력창 엔터/포커스 해제 시 허용 각도 범위 클램핑
+        input.addEventListener('change', () => {
+            let val = parseFloat(input.value);
+            if (isNaN(val)) val = 0.0;
+            const min = parseFloat(slider.min);
+            const max = parseFloat(slider.max);
+            val = Math.max(min, Math.min(max, val));
+            input.value = val.toFixed(1);
+            slider.value = val;
+            onAngleChanged();
         });
     }
 
@@ -165,7 +168,7 @@ function setupUIEventListeners() {
     if (btnHome) {
         btnHome.addEventListener('click', () => {
             setSliderValues([0, 0, 0, 0, 0, 0]);
-            onSliderChanged();
+            onAngleChanged();
         });
     }
 
@@ -173,7 +176,7 @@ function setupUIEventListeners() {
     if (btnTest) {
         btnTest.addEventListener('click', () => {
             setSliderValues([0, -30, 60, 0, 45, 0]);
-            onSliderChanged();
+            onAngleChanged();
         });
     }
 }
@@ -181,27 +184,29 @@ function setupUIEventListeners() {
 function setSliderValues(anglesDeg) {
     for (let i = 0; i < 6; i++) {
         const slider = document.getElementById(`slider-q${i}`);
-        const valText = document.getElementById(`val-q${i}`);
-        if (slider) {
-            slider.value = anglesDeg[i];
-        }
-        if (valText) {
-            valText.innerText = `${anglesDeg[i].toFixed(1)}°`;
-        }
+        const input = document.getElementById(`input-q${i}`);
+        if (slider) slider.value = anglesDeg[i];
+        if (input) input.value = anglesDeg[i].toFixed(1);
     }
 }
 
 function getSliderAnglesRad() {
     const q_rad = [];
     for (let i = 0; i < 6; i++) {
+        const input = document.getElementById(`input-q${i}`);
         const slider = document.getElementById(`slider-q${i}`);
-        const deg = slider ? parseFloat(slider.value) : 0.0;
+        let deg = 0.0;
+        if (input && !isNaN(parseFloat(input.value))) {
+            deg = parseFloat(input.value);
+        } else if (slider) {
+            deg = parseFloat(slider.value);
+        }
         q_rad.push((deg * Math.PI) / 180.0);
     }
     return q_rad;
 }
 
-function onSliderChanged() {
+function onAngleChanged() {
     const q = getSliderAnglesRad();
     requestRobotPose(q);
 }
