@@ -31,7 +31,7 @@
   pip install -r requirements.txt
   ```
 * **Web Environment**:
-  * WebGL을 지원하는 모던 웹 브라우저 (Chrome, Edge 등)
+  * WebGL을 지원하는 웹 브라우저 (Chrome, Edge 등)
   * 외부 CDN(Three.js, STLLoader) 로드를 위한 인터넷 연결 환경
 
 ---
