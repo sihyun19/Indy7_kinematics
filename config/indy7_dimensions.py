@@ -43,7 +43,7 @@ INDY7_JOINTS = [
     # Joint 1: base -> link1
     Joint(
         name="joint1",
-        len_val=0.000, len_dir=Z_POS, #베이스 위치 정보
+        len_val=0.0775, len_dir=Z_POS, #베이스 위치 정보
         off_val=0.0,    off_dir=ZERO,
         rpy=np.array([0., 0., 0.]),
         axis=Z_POS, sign=1
@@ -51,7 +51,7 @@ INDY7_JOINTS = [
     # Joint 2: link1 -> link2
     Joint(
         name="joint2",
-        len_val=0.3000, len_dir=Z_POS, #link1 길이
+        len_val=0.2225, len_dir=Z_POS, #link1 길이
         off_val=0.1090, off_dir=Y_NEG,
         rpy=np.array([H, H, 0.]),
         axis=Z_POS, sign=1
