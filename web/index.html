@@ -128,6 +128,29 @@
         .btn-secondary:hover {
             background: #f4f4f5;
         }
+        .cam-btn-group {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 12px;
+        }
+        .btn-cam {
+            flex: 1;
+            height: 26px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 11px;
+            font-weight: bold;
+            letter-spacing: 0.2px;
+            font-family: Arial, sans-serif;
+            background: #ffffff;
+            color: #000000;
+            border: 1px solid #000000;
+            transition: all 0.15s;
+        }
+        .btn-cam:hover {
+            background: #000000;
+            color: #ffffff;
+        }
         .pose-container {
             display: flex;
             gap: 8px;
@@ -231,6 +254,13 @@
         <div class="btn-group">
             <button id="btn-home" class="btn btn-primary">Home (0°)</button>
             <button id="btn-test" class="btn btn-secondary">Test Pose</button>
+        </div>
+
+        <div class="cam-btn-group">
+            <button id="cam-top" class="btn-cam" title="XY 평면 상면도">Top</button>
+            <button id="cam-front" class="btn-cam" title="XZ 평면 정면도">Front</button>
+            <button id="cam-side" class="btn-cam" title="YZ 평면 측면도">Side</button>
+            <button id="cam-iso" class="btn-cam" title="등각 투영 기본 뷰">Iso</button>
         </div>
 
         <div class="pose-container">

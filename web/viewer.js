@@ -6,6 +6,17 @@ let tcpAxesHelper = null;
 let isUpdating = false;
 let pendingAngles = null;
 
+let isTransitioningCamera = false;
+const targetCamPos = new THREE.Vector3();
+const targetControlsTarget = new THREE.Vector3();
+
+const CAMERA_PRESETS = {
+    top: { pos: [0.0001, -0.0001, 2.6], target: [0, 0, 0.6] },
+    front: { pos: [0.0, -2.4, 0.7], target: [0, 0, 0.7] },
+    side: { pos: [2.4, 0.0, 0.7], target: [0, 0, 0.7] },
+    iso: { pos: [1.5, -1.8, 1.3], target: [0, 0, 0.6] }
+};
+
 const STL_PATHS = [
     '/model/meshes/indy7/visual/Indy7_0.stl',
     '/model/meshes/indy7/visual/Indy7_1.stl',
@@ -36,12 +47,19 @@ function init() {
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     container.appendChild(renderer.domElement);
 
-    // OrbitControls 생성
+    // OrbitControls 생성 (360도 전방향 자유 궤도 회전 허용)
     controls = new THREE.OrbitControls(camera, renderer.domElement);
     controls.target.set(0, 0, 0.6);
     controls.enableDamping = true;
     controls.dampingFactor = 0.05;
-    controls.maxPolarAngle = Math.PI / 2 + 0.1; // 바닥 아래로 과도하게 내려가지 않도록 제한
+    controls.maxPolarAngle = Math.PI; // 바닥 하부 포함 360도 자유 회전
+    controls.minPolarAngle = 0;
+    controls.screenSpacePanning = true;
+
+    // 사용자 수동 조작 시 자동 카메라 전환 즉시 중단
+    controls.addEventListener('start', () => {
+        isTransitioningCamera = false;
+    });
 
     // 조명 구성
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.65);
@@ -179,6 +197,24 @@ function setupUIEventListeners() {
             onAngleChanged();
         });
     }
+
+    // 카메라 프리셋 버튼 이벤트 리스너
+    ['top', 'front', 'side', 'iso'].forEach((key) => {
+        const btn = document.getElementById(`cam-${key}`);
+        if (btn) {
+            btn.addEventListener('click', () => {
+                setCameraPreset(key);
+            });
+        }
+    });
+}
+
+function setCameraPreset(presetKey) {
+    const preset = CAMERA_PRESETS[presetKey];
+    if (!preset) return;
+    targetCamPos.set(...preset.pos);
+    targetControlsTarget.set(...preset.target);
+    isTransitioningCamera = true;
 }
 
 function setSliderValues(anglesDeg) {
@@ -281,6 +317,19 @@ function onWindowResize() {
 
 function animate() {
     requestAnimationFrame(animate);
+
+    if (isTransitioningCamera) {
+        camera.position.lerp(targetCamPos, 0.08);
+        controls.target.lerp(targetControlsTarget, 0.08);
+
+        if (camera.position.distanceTo(targetCamPos) < 0.002 &&
+            controls.target.distanceTo(targetControlsTarget) < 0.002) {
+            camera.position.copy(targetCamPos);
+            controls.target.copy(targetControlsTarget);
+            isTransitioningCamera = false;
+        }
+    }
+
     controls.update();
     renderer.render(scene, camera);
 }
