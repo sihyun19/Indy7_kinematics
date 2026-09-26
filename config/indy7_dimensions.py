@@ -13,7 +13,6 @@ ZERO  = np.array([ 0.,  0.,  0.])
 
 H = 1.570796327  # 90deg (rad)
 
-
 @dataclass(frozen=True)
 class Joint:
 
@@ -32,6 +31,8 @@ class Joint:
     rpy: np.ndarray
     axis: np.ndarray = field(default_factory=lambda: Z_POS.copy())
     sign: int = 1
+    com: np.ndarray = field(default_factory=lambda: ZERO.copy())
+    mass: float = 0.0
 
     @property
     def origin(self) -> np.ndarray:
@@ -46,7 +47,8 @@ INDY7_JOINTS = [
         len_val=0.0775, len_dir=Z_POS, #베이스 위치 정보
         off_val=0.0,    off_dir=ZERO,
         rpy=np.array([0., 0., 0.]),
-        axis=Z_POS, sign=1
+        axis=Z_POS, sign=1,
+        com= np.array([1.0e-06, -0.038646, 0.150736]), mass=11.44444535
     ),
     # Joint 2: link1 -> link2
     Joint(
@@ -54,7 +56,8 @@ INDY7_JOINTS = [
         len_val=0.2225, len_dir=Z_POS, #link1 길이
         off_val=0.1090, off_dir=Y_NEG,
         rpy=np.array([H, H, 0.]),
-        axis=Z_POS, sign=1
+        axis=Z_POS, sign=1,
+        com=np.array([-0.248250, -2.0e-06, 0.076528]), mass=5.84766553
     ),
     # Joint 3: link2 -> link3
     Joint(
@@ -62,7 +65,8 @@ INDY7_JOINTS = [
         len_val=0.4500, len_dir=X_NEG, #link2 길이
         off_val=0.0305, off_dir=Z_NEG,
         rpy=np.array([0., 0., 0.]),
-        axis=Z_POS, sign=1
+        axis=Z_POS, sign=1,
+        com=np.array([-0.129304, -1.3988e-10, -0.072209]), mass=2.68206064
     ),
     # Joint 4: link3 -> link4
     Joint(
@@ -70,7 +74,8 @@ INDY7_JOINTS = [
         len_val=0.2670, len_dir=X_NEG, #link3 길이
         off_val=0.0750, off_dir=Z_NEG,
         rpy=np.array([-H, 0., H]),
-        axis=Z_POS, sign=1
+        axis=Z_POS, sign=1,
+        com=np.array([-2.0e-06, -0.035728, 0.051948]), mass=2.12987371
     ),
     # Joint 5: link4 -> link5
     Joint(
@@ -78,7 +83,8 @@ INDY7_JOINTS = [
         len_val=0.0830, len_dir=Z_POS, #link4 길이
         off_val=0.1140, off_dir=Y_NEG,
         rpy=np.array([H, H, 0.]),
-        axis=Z_POS, sign=1
+        axis=Z_POS, sign=1,
+        com=np.array([-0.045433, 3.0e-06, 0.062349]), mass=2.22412271
     ),
     # Joint 6: link5 -> link6
     Joint(
@@ -86,10 +92,13 @@ INDY7_JOINTS = [
         len_val=0.1680, len_dir=X_NEG, #link5 길이
         off_val=0.0690, off_dir=Z_POS,
         rpy=np.array([-H, 0., H]),
-        axis=Z_POS, sign=1
+        axis=Z_POS, sign=1,
+        com=np.array([-1.5085e-10, -0.000421, 0.031452]), mass=0.38254932
     ),
 ]
 
 # Link 6 -> TCP (고정 툴)
 TCP_OFFSET = 0.0600  # 60 mm
 TCP_DIR = Z_POS
+TCP_MASS = 0.0       
+TCP_COM = ZERO.copy() # TCP 좌표계 기준 툴 무게중심 오프셋 (m)

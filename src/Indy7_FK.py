@@ -57,7 +57,7 @@ def fk(
     joints: list[Joint] = INDY7_JOINTS, 
     tcp_offset: float = TCP_OFFSET, 
     tcp_dir: np.ndarray = TCP_DIR
-) -> tuple[np.ndarray, np.ndarray, np.ndarray, list[np.ndarray]]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, list[np.ndarray]]:
     """
     Indy7 정기구학 (Forward Kinematics) 계산 함수
     
@@ -68,19 +68,22 @@ def fk(
         tcp_dir: 툴 끝단 연장 방향 단위벡터
         
     반환값:
-        T: 베이스 기준 최종 TCP의 4x4 행렬
-        orig: 각 조인트의 3차원 월드 위치 (3x6 행렬)
-        zax: 각 조인트 회전축의 3차원 월드 방향 (3x6 행렬)
+        T_tcp: 베이스 기준 최종 TCP의 4x4 행렬
+        p_joints: 각 조인트의 3차원 월드 위치 (3x6 행렬)
+        z_axes: 각 조인트 회전축의 3차원 월드 방향 (3x6 행렬)
+        p_com: 각 링크의 3차원 절대 무게중심 위치 (3x6 행렬)
+        T_links: 베이스 및 각 링크의 누적 변환행렬 리스트 (7개)
     """
     # 1. 누적 변환행렬 초기화 (베이스 좌표계)
     M = np.eye(4)
     
-    # 2. 자코비안 계산용
-    orig = np.zeros((3, 6))
-    zax  = np.zeros((3, 6))
+    # 2. 자코비안 및 동역학 계산용 버퍼
+    p_joints = np.zeros((3, 6))
+    z_axes   = np.zeros((3, 6))
+    p_com    = np.zeros((3, 6)) 
 
-    # 3. 각 링크 변환행렬 별도 저장->시뮬레이션 구축용
-    link_transforms = [M.copy()]
+    # 3. 각 링크 변환행렬 별도 저장->시뮬레이션 및 자코비안 용
+    T_links = [M.copy()]
     
     # 4. 6개 링크 순차 누적 루프
     for i, j in enumerate(joints):
@@ -89,49 +92,50 @@ def fk(
         M = M @ T_fixed
         
         # 이번 관절의 월드 좌표계 위치 및 회전축 추출
-        orig[:, i] = M[:3, 3]  # 조인트 중심 위치
-        zax[:, i]  = M[:3, 2]  # 조인트 z축 방향 (3번째 열)
+        p_joints[:, i] = M[:3, 3]  # 조인트 중심 위치
+        z_axes[:, i]   = M[:3, 2]  # 조인트 z축 방향 (3번째 열)
         
         # 모터 회전 변환 적용 (엔코더 부호 반영)
         theta = j.sign * q[i]
         M = M @ htf(rot_z(theta))
-        link_transforms.append(M.copy())#회전 적용 이후의 링크 변환행렬 저장(시뮬레이션용)
+        T_links.append(M.copy())  # 회전 적용 이후의 링크 변환행렬 저장
+        p_com[:, i] = M[:3, :3] @ j.com + M[:3, 3]  # 각 링크의 무게중심 위치
 
     # 5. 최종 TCP 고정 변환 결합
-    T_tcp = htf(np.eye(3), tcp_offset * tcp_dir)
-    T = M @ T_tcp
+    T_tcp = M @ htf(np.eye(3), tcp_offset * tcp_dir)
     
-    return T, orig, zax, link_transforms
+    return T_tcp, p_joints, z_axes, p_com, T_links
 
 def evaluate_fk(q_deg: list[float] | np.ndarray, name: str = "Pose") -> dict:
     """도(deg) 단위 각도를 받아 FK 계산 후 결과 출력"""
     q_rad = np.radians(q_deg)
-    T, orig, zax, link_transforms = fk(q_rad)
-    tcp_pos = T[:3, 3]
-    tcp_rpy = rot_rpy(T[:3, :3])
+    T_tcp, p_joints, z_axes, p_com, T_links = fk(q_rad)
+    tcp_pos = T_tcp[:3, 3]
+    tcp_rpy = rot_rpy(T_tcp[:3, :3])
     
     print(f"\n=== {name} ===")
     print("TCP 위치 (XYZ, mm):", np.round(tcp_pos * 1000.0, 2))
     print("TCP 회전 (RPY, deg):", np.round(np.degrees(tcp_rpy), 2))
     
     return {
-        "T": T,
+        "T_tcp": T_tcp,
         "tcp_pos": tcp_pos,
         "tcp_rpy": tcp_rpy,
-        "orig": orig,
-        "zax": zax,
-        "link_transforms": link_transforms
+        "p_joints": p_joints,
+        "z_axes": z_axes,
+        "p_com": p_com,
+        "T_links": T_links
     }
 
 if __name__ == "__main__":
     # Sanity Check: q = [0, 0, 0, 0, 0, 0]일 때 TCP 위치 확인
     q_zero = np.zeros(6)
-    T_res, orig_res, zax_res, link_transforms_res = fk(q_zero)
-    tcp_pos = T_res[:3, 3]
+    T_tcp_res, p_joints_res, z_axes_res, p_com_res, T_links_res = fk(q_zero)
+    tcp_pos = T_tcp_res[:3, 3]
     print("=== Indy7 FK Sanity Check ===")
     print("TCP 위치 (XYZ, m):", np.round(tcp_pos, 4))
     print("기대값            : [ 0.     -0.1865  1.3275]")
-    print(f"저장된 링크 변환행렬 개수: {len(link_transforms_res)}개 (Base + Link)")
+    print(f"저장된 링크 변환행렬 개수: {len(T_links_res)}개 (Base + Link)")
 
 
     print("=== Indy7 FK 각도 입력===")

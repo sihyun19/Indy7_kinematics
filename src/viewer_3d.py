@@ -28,13 +28,13 @@ class KinematicsRequestHandler(http.server.SimpleHTTPRequestHandler):
             except ValueError:
                 q = np.zeros(6)
             
-            T, orig, zax, link_transforms = fk(q)
+            T_tcp, p_joints, z_axes, p_com, T_links = fk(q)
             
             # Three.js Column-major 규격에 맞춰 전치(.T) 후 1차원 평탄화 (16개 원소)
-            matrices_col_major = [mat.T.flatten().tolist() for mat in link_transforms]
-            tcp_pos = T[:3, 3].tolist()
-            tcp_rpy = np.degrees(rot_rpy(T[:3, :3])).tolist()
-            tcp_matrix = T.T.flatten().tolist()
+            matrices_col_major = [mat.T.flatten().tolist() for mat in T_links]
+            tcp_pos = T_tcp[:3, 3].tolist()
+            tcp_rpy = np.degrees(rot_rpy(T_tcp[:3, :3])).tolist()
+            tcp_matrix = T_tcp.T.flatten().tolist()
             
             payload = json.dumps({
                 "matrices": matrices_col_major,
