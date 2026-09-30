@@ -6,13 +6,13 @@ def tcp_jacobian(q: np.ndarray) -> np.ndarray:
     T_tcp, p_joints, z_axes, p_com, T_links = fk(q)
     p_tcp = T_tcp[:3, 3]  # TCP 위치
     
-    J = np.zeros((6, 6))
+    J_tcp = np.zeros((6, 6))
     for j in range(6):
         z_j = z_axes[:, j]
         p_j = p_joints[:, j]
-        J[:3, j] = np.cross(z_j, p_tcp - p_j) #선속도 v=rw
-        J[3:, j] = z_j #각속도 w
-    return J
+        J_tcp[:3, j] = np.cross(z_j, p_tcp - p_j) #선속도 v=rw
+        J_tcp[3:, j] = z_j #각속도 w
+    return J_tcp
 
 def link_jacobian(q:np.ndarray) -> list[np.ndarray]:
     """

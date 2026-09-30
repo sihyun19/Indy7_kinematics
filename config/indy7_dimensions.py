@@ -11,6 +11,13 @@ Z_POS = np.array([ 0.,  0.,  1.])
 Z_NEG = np.array([ 0.,  0., -1.])
 ZERO  = np.array([ 0.,  0.,  0.])
 
+def inertia_tensor(Ixx,Ixy,Ixz,Iyy,Iyz,Izz):
+    return np.array([
+        [Ixx, Ixy, Ixz],
+        [Ixy, Iyy, Iyz],
+        [Ixz, Iyz, Izz]
+    ])
+
 H = 1.570796327  # 90deg (rad)
 
 @dataclass(frozen=True)
@@ -33,6 +40,7 @@ class Joint:
     sign: int = 1
     com: np.ndarray = field(default_factory=lambda: ZERO.copy())
     mass: float = 0.0
+    inertia: np.ndarray = field(default_factory=lambda: np.zeros((3,3)))
 
     @property
     def origin(self) -> np.ndarray:
@@ -48,7 +56,11 @@ INDY7_JOINTS = [
         off_val=0.0,    off_dir=ZERO,
         rpy=np.array([0., 0., 0.]),
         axis=Z_POS, sign=1,
-        com= np.array([1.0e-06, -0.038646, 0.150736]), mass=11.44444535
+
+        com= np.array([1.0e-06, -0.038646, 0.150736]),
+        mass=11.44444535,
+        inertia=inertia_tensor(0.116323, 2.2231e-08, -4.6998e-07, 0.108785, 0.028501, 0.056304)
+
     ),
     # Joint 2: link1 -> link2
     Joint(
@@ -57,7 +69,10 @@ INDY7_JOINTS = [
         off_val=0.1090, off_dir=Y_NEG,
         rpy=np.array([H, H, 0.]),
         axis=Z_POS, sign=1,
-        com=np.array([-0.248250, -2.0e-06, 0.076528]), mass=5.84766553
+
+        com=np.array([-0.248250, -2.0e-06, 0.076528]),
+        mass=5.84766553,
+        inertia=inertia_tensor(0.018936, 3.4202e-06, -0.008344, 0.172720, 1.1368e-06, 0.170433)
     ),
     # Joint 3: link2 -> link3
     Joint(
@@ -66,7 +81,10 @@ INDY7_JOINTS = [
         off_val=0.0305, off_dir=Z_NEG,
         rpy=np.array([0., 0., 0.]),
         axis=Z_POS, sign=1,
-        com=np.array([-0.129304, -1.3988e-10, -0.072209]), mass=2.68206064
+
+        com=np.array([-0.129304, -1.3988e-10, -0.072209]),
+        mass=2.68206064,
+        inertia=inertia_tensor(0.004829, -9.8461e-08, -0.002005, 0.032320, -4.8364e-09, 0.032111)
     ),
     # Joint 4: link3 -> link4
     Joint(
@@ -75,7 +93,10 @@ INDY7_JOINTS = [
         off_val=0.0750, off_dir=Z_NEG,
         rpy=np.array([-H, 0., H]),
         axis=Z_POS, sign=1,
-        com=np.array([-2.0e-06, -0.035728, 0.051948]), mass=2.12987371
+
+        com=np.array([-2.0e-06, -0.035728, 0.051948]),
+        mass=2.12987371,
+        inertia=inertia_tensor(0.008317, 1.6537e-07, 7.7825e-08, 0.004361, 0.002357, 0.006760)
     ),
     # Joint 5: link4 -> link5
     Joint(
@@ -84,7 +105,10 @@ INDY7_JOINTS = [
         off_val=0.1140, off_dir=Y_NEG,
         rpy=np.array([H, H, 0.]),
         axis=Z_POS, sign=1,
-        com=np.array([-0.045433, 3.0e-06, 0.062349]), mass=2.22412271
+
+        com=np.array([-0.045433, 3.0e-06, 0.062349]), 
+        mass=2.22412271,
+        inertia=inertia_tensor(0.004213, 1.1361e-06, 0.001331, 0.010417, -8.4365e-07, 0.010051)
     ),
     # Joint 6: link5 -> link6
     Joint(
@@ -92,9 +116,12 @@ INDY7_JOINTS = [
         len_val=0.1680, len_dir=X_NEG, #link5 길이
         off_val=0.0690, off_dir=Z_POS,
         rpy=np.array([-H, 0., H]),
+
         axis=Z_POS, sign=1,
-        com=np.array([-1.5085e-10, -0.000421, 0.031452]), mass=0.38254932
-    ),
+        com=np.array([-1.5085e-10, -0.000421, 0.031452]), 
+        mass=0.38254932,
+        inertia=inertia_tensor(0.000301, 5.9436e-08, 3.7350e-15, 0.000300, 5.1952e-08, 0.000392)
+    )
 ]
 
 # Link 6 -> TCP (고정 툴)
