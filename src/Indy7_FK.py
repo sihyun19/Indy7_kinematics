@@ -143,6 +143,7 @@ if __name__ == "__main__":
     print("입력 예시: 0 -30 60 0 45 0\n")
     while True:
         user_input = input(">> 각도 입력 [J1 J2 J3 J4 J5 J6]: ").strip()
+
         if user_input.lower() == 'q':
             print("종료합니다.")
             break
@@ -153,5 +154,6 @@ if __name__ == "__main__":
                 print(f"각도는 정확히 6개여야 합니다. (현재 입력: {len(q_list)}개)")
                 continue
             evaluate_fk(q_list, name="입력된 자세")
+            
         except ValueError:
             print("[오류] 올바른 숫자 형식으로 입력해주세요.")
