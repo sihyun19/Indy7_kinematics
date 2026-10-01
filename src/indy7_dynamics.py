@@ -23,5 +23,18 @@ def inertia_mat(
         M_q += j.mass * J_vi.T @ J_vi +  J_wi.T @ I_world_i @ J_wi
     return M_q
 
+def gravity_vec(
+        q:np.ndarray,
+        joints: list[Joint] = INDY7_JOINTS
+)-> np.ndarray:
+    """
+    중력 벡터 g(q) 계산
+    반환값: g_q
+    """
+    g_q = np.zeros(6)
+    J = link_jacobian(q)
+    for i, j in enumerate(joints):
+        J_vi= J[i][:3,:]
+        g_q += j.mass * J_vi.T @ np.array([0, 0, 9.80665])  
 
-
+    return g_q
