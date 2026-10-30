@@ -32,7 +32,7 @@ def coriolis_vec(
     코리올리 벡터 C(q, q_dot) 계산
     반환값: C_q_qdot
     """
-    C_q_qdot = np.zeros(6)
+    C_q_qdot = np.zeros((6,6))
     
     dM_dq = np.zeros((6, 6, 6))
     for k in range(6):
@@ -50,8 +50,8 @@ def coriolis_vec(
     for i in range(6):
         for j in range(6):
             for k in range(6):
-                c_ijk = 0.5 * (dM_dq[k, i, j] + dM_dq[j, i, k] - dM_dq[i, j, k]) * q_dot[j] * q_dot[k]
-                C_q_qdot[i] += c_ijk
+                c_ijk = 0.5 * (dM_dq[k, i, j] + dM_dq[j, i, k] - dM_dq[i, j, k]) * q_dot[k]
+                C_q_qdot[i, j] += c_ijk
     return C_q_qdot
 
 def gravity_vec(
@@ -84,5 +84,5 @@ def torque_vec(
     C_q_qdot = coriolis_vec(q, q_dot, joints)
     g_q = gravity_vec(q, joints)
 
-    tau = M_q @ q_ddot + C_q_qdot + g_q
+    tau = M_q @ q_ddot + C_q_qdot @ q_dot + g_q
     return tau
