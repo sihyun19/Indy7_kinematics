@@ -45,7 +45,7 @@ def compute_torque(
     q: np.ndarray, 
     qdot: np.ndarray, 
     qddot: np.ndarray, 
-    payload_params: np.ndarray | None = None, # mass, c_x, c_y, Izz_com 순서 
+    payload_params: np.ndarray | None = None, 
     friction_params: np.ndarray | None = None
 ) -> np.ndarray:
     """
@@ -57,7 +57,7 @@ def compute_torque(
       friction_params: (6,) [fv1, fc1, fv2, fc2, fv3, fc3] (미입력 시 0으로 처리)
       
     출력:
-      tau_total      : (3,) 각 관절에 요구되는 전체 토크 [N*m]
+      Torque      : (3,) 각 관절에 요구되는 전체 토크 [N*m]
     """
     phi = np.cumsum(q) 
     phi_dot = np.cumsum(qdot) 
@@ -74,7 +74,7 @@ def compute_torque(
 
     Jv_list = []
     Jv_dot_list = []
-    for i in range(3)
+    for i in range(3):
         Jv_i = np.zeros((2, 3))
         Jv_dot_i = np.zeros((2, 3))
         for k in range(i):
@@ -94,13 +94,46 @@ def compute_torque(
         M_robot[:i + 1, :i + 1] += I[i]                              #관성항
         C_robot += m[i] * (Jv_list[i].T @ Jv_dot_list[i])            #코리올리항
         g_robot += Jv_list[i].T @ (m[i] * np.array([0.0, 9.80665])) # 중력항
-
+    
+    #페이로드
     M_payload = np.zeros((3, 3))
+    C_payload = np.zeros((3, 3))
+    g_payload = np.zeros(3)
     if payload_params is not None:
-        u_payload = payload_params[1] * T[3] +  payload_params[2] * N[3]
-        Jv_payload = Jv_list[3] + np.column_stack([u_payload, u_payload, u_payload])
+        u_payload = payload_params[1] * T[2] +  payload_params[2] * N[2]
+        u_dot_payload = phi_dot[-1] * ( payload_params[1] * N[2] - payload_params[2] * T[2] )
+        Jv_payload = Jv_list[2] + np.column_stack([-uc[2]+u[2]+u_payload, -uc[2]+u[2]+u_payload, -uc[2]+u[2]+u_payload])
+        Jv_dot_payload = Jv_dot_list[2] + np.column_stack([-uc_dot[2]+u_dot[2]+u_dot_payload, -uc_dot[2]+u_dot[2]+u_dot_payload, -uc_dot[2]+u_dot[2]+u_dot_payload])
         m_payload = payload_params[0]
         I_payload = payload_params[3]
-        # 페이로드 관성 구현 진행예정
-    M_total = M_robot + M_payload
 
+        M_payload = m_payload * ( Jv_payload.T @ Jv_payload ) + I_payload * np.ones((3, 3))
+        C_payload = m_payload * (Jv_payload.T @ Jv_dot_payload )
+        g_payload = Jv_payload.T @ (m_payload * np.array([0.0, 9.80665]))
+
+    M_total = M_robot + M_payload
+    C_total = C_robot + C_payload
+    g_total = g_robot + g_payload
+
+    Torque = M_total @ qddot + C_total @ qdot + g_total
+    return Torque
+
+def linearify(
+    q: np.ndarray, 
+    qdot: np.ndarray, 
+    qddot: np.ndarray, 
+) -> np.ndarray:
+    """          
+        출력:
+          Y               : (3, 4) 파라미터 m, mc_x,mc_y, I_o(I_com+m(c_x^2+c_y^2))에 대한 선형 회귀행렬
+    """
+    Y = np.zeros((3,4))
+    torque_robot = compute_torque( q, qdot, qddot)
+    Y[:,0] = compute_torque( q, qdot, qddot, np.array([1, 0, 0, 0]) )- torque_robot
+    Y[:,1] = compute_torque( q, qdot, qddot, np.array([1, 1, 0, 0]) )- Y[:,0] - torque_robot
+    Y[:,2] = compute_torque( q, qdot, qddot, np.array([1, 0, 1, 0]) )- Y[:,0] - torque_robot
+    Y[:,3] = compute_torque( q, qdot, qddot, np.array([0, 0, 0, 1]) )- torque_robot
+    return Y
+
+if __name__ == "__main__":
+    
