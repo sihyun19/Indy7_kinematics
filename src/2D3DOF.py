@@ -53,7 +53,7 @@ def compute_torque(
     
     입력:
       q, qdot, qddot     : (3,) 각도, 각속도, 각가속도 [rad, rad/s, rad/s^2]
-      payload_params : (4,) [m, c_x, c_y, I_O] (미입력 시 0으로 처리)
+      payload_params : (4,) [m, c_x, c_y, I_o] (미입력 시 0으로 처리)
       friction_params: (6,) [fv1, fc1, fv2, fc2, fv3, fc3] (미입력 시 0으로 처리)
       
     출력:
@@ -95,7 +95,7 @@ def compute_torque(
         C_robot += m[i] * (Jv_list[i].T @ Jv_dot_list[i])            #코리올리항
         g_robot += Jv_list[i].T @ (m[i] * np.array([0.0, 9.80665])) # 중력항
     
-    #페이로드
+    #페이로드   
     M_payload = np.zeros((3, 3))
     C_payload = np.zeros((3, 3))
     g_payload = np.zeros(3)
@@ -105,7 +105,7 @@ def compute_torque(
         Jv_payload = Jv_list[2] + np.column_stack([-uc[2]+u[2]+u_payload, -uc[2]+u[2]+u_payload, -uc[2]+u[2]+u_payload])
         Jv_dot_payload = Jv_dot_list[2] + np.column_stack([-uc_dot[2]+u_dot[2]+u_dot_payload, -uc_dot[2]+u_dot[2]+u_dot_payload, -uc_dot[2]+u_dot[2]+u_dot_payload])
         m_payload = payload_params[0]
-        I_payload = payload_params[3]
+        I_payload = payload_params[3] - m_payload * (payload_params[1]**2 + payload_params[2]**2)
 
         M_payload = m_payload * ( Jv_payload.T @ Jv_payload ) + I_payload * np.ones((3, 3))
         C_payload = m_payload * (Jv_payload.T @ Jv_dot_payload )
@@ -118,14 +118,14 @@ def compute_torque(
     Torque = M_total @ qddot + C_total @ qdot + g_total
     return Torque
 
-def linearify(
+def compute_regressor(
     q: np.ndarray, 
     qdot: np.ndarray, 
     qddot: np.ndarray, 
 ) -> np.ndarray:
     """          
         출력:
-          Y               : (3, 4) 파라미터 m, mc_x,mc_y, I_o(I_com+m(c_x^2+c_y^2))에 대한 선형 회귀행렬
+          Y               : (3, 4) 파라미터 m, mc_x,mc_y, I_o)에 대한 선형 회귀행렬
     """
     Y = np.zeros((3,4))
     torque_robot = compute_torque( q, qdot, qddot)
@@ -136,4 +136,13 @@ def linearify(
     return Y
 
 if __name__ == "__main__":
-    
+    q, qd, qdd = np.array([0.2, 0.4, -0.3]), np.array([0.5, -0.2, 0.8]), np.array([1.2, -0.6, 0.4])
+    p_true = np.array([2.5, 0.04, -0.02, 0.015])  # m, cx, cy, Io
+
+    tau_pay_direct = compute_torque(q, qd, qdd, p_true) - compute_torque(q, qd, qdd)
+    Y = compute_regressor(q, qd, qdd)
+    theta = np.array([p_true[0], p_true[0]*p_true[1], p_true[0]*p_true[2], p_true[3]])
+    tau_pay_linear = Y @ theta
+
+    error = np.max(np.abs(tau_pay_direct - tau_pay_linear))
+    print(f"선형화 정합성 최대 오차: {error:.2e} N*m (통과 여부: {error < 1e-12})")
