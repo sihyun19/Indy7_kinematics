@@ -137,11 +137,11 @@ def compute_regressor(
 
 if __name__ == "__main__":
     q, qd, qdd = np.array([0.2, 0.4, -0.3]), np.array([0.5, -0.2, 0.8]), np.array([1.2, -0.6, 0.4])
-    p_true = np.array([2.5, 0.04, -0.02, 0.015])  # m, cx, cy, Io
+    params = np.array([2.5, 0.04, -0.02, 0.015])  # m, cx, cy, Io
 
-    tau_pay_direct = compute_torque(q, qd, qdd, p_true) - compute_torque(q, qd, qdd)
+    tau_pay_direct = compute_torque(q, qd, qdd, params) - compute_torque(q, qd, qdd)
     Y = compute_regressor(q, qd, qdd)
-    theta = np.array([p_true[0], p_true[0]*p_true[1], p_true[0]*p_true[2], p_true[3]])
+    theta = np.array([params[0], params[0]*params[1], params[0]*params[2], params[3]])
     tau_pay_linear = Y @ theta
 
     error = np.max(np.abs(tau_pay_direct - tau_pay_linear))
