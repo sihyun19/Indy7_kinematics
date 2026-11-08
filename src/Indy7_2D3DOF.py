@@ -6,55 +6,51 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 from config.indy7_dimensions import Joint, INDY7_JOINTS, TCP_OFFSET, TCP_DIR
 
-# 파라미터 정리
+#파라미터 정리
 @dataclass
 class Joint2D:
     name: str
     lenth: float
     lenth_dir: np.ndarray | None = None
-    l_com: float = 0.5
+    l_com: float=0.5
     mass: float = 0.0
-    inertia_zz: float = 2.0
-    q_limit_upper: float = 3.0543
-    q_limit_lower: float = -3.0543
-    qdot_limit: float = 2.6180
-    effort: float = 431.97
+    inertia_zz : float = 2.0
+    q_limit_upper : float = 0.0
+    q_limit_lower : float = 0.0 
+    qdot_limit : float = 0.0 
+    effort : float = 0.0 
 
 INDY7_2D_JOINTS = [
     Joint2D(
-        name="joint0",  # base
-        lenth=INDY7_JOINTS[0].len_val + INDY7_JOINTS[1].len_val,
-        q_limit_upper=0.0,
-        q_limit_lower=0.0,
-        qdot_limit=0.0,
-        effort=431.97
+        name = "joint0",#base
+        lenth = INDY7_JOINTS[0].len_val + INDY7_JOINTS[1].len_val
     ),
     Joint2D(
-        name="joint1",
-        lenth=INDY7_JOINTS[2].len_val,
-        mass=INDY7_JOINTS[2].mass,
-        q_limit_upper=3.0543,
-        q_limit_lower=-3.0543,
-        qdot_limit=2.6180,
-        effort=431.97
+        name = "joint1",
+        lenth = INDY7_JOINTS[2].len_val,
+        mass = INDY7_JOINTS[2].mass,
+        q_limit_upper = 3.0543261909900767,
+        q_limit_lower = -3.0543261909900767,
+        qdot_limit = 2.6179938779914944,
+        effort = 431.97
     ),
     Joint2D(
-        name="joint2",
-        lenth=INDY7_JOINTS[3].len_val + INDY7_JOINTS[4].len_val,
-        mass=INDY7_JOINTS[3].mass + INDY7_JOINTS[4].mass,
-        q_limit_upper=3.0543,
-        q_limit_lower=-3.0543,
-        qdot_limit=2.6180,
-        effort=197.23
+        name = "joint2",
+        lenth =  INDY7_JOINTS[3].len_val + INDY7_JOINTS[4].len_val,
+        mass = INDY7_JOINTS[3].mass + INDY7_JOINTS[4].mass,
+        q_limit_upper = 3.0543261909900767,
+        q_limit_lower = -3.0543261909900767,
+        qdot_limit = 2.6179938779914944,
+        effort = 197.23
     ),
     Joint2D(
-        name="joint3",
-        lenth=INDY7_JOINTS[5].len_val + TCP_OFFSET,
-        mass=INDY7_JOINTS[5].mass,
-        q_limit_upper=3.0543,
-        q_limit_lower=-3.0543,
-        qdot_limit=3.1416,
-        effort=79.79
+        name = "joint3",
+        lenth = INDY7_JOINTS[5].len_val + TCP_OFFSET,
+        mass = INDY7_JOINTS[5].mass,
+        q_limit_upper = 3.0543261909900767,
+        q_limit_lower = -3.0543261909900767,
+        qdot_limit = 3.141592653589793,
+        effort = 79.79
     )
 ]
 
@@ -76,8 +72,6 @@ def forward_kinematics(q: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarra
     p2 = p1 + L[1] * T[1]
     p3 = p2 + L[2] * T[2]
     return p1, p2, p3
-
-print(f"base= {INDY7_2D_JOINTS[0].lenth}, L1= {INDY7_2D_JOINTS[1].lenth}, L2= {INDY7_2D_JOINTS[2].lenth}, L3= {INDY7_2D_JOINTS[3].lenth}")
 
 def compute_torque(
     q: np.ndarray, 
