@@ -17,26 +17,25 @@ class Joint2D:
     inertia_zz : float = 2.0
 
 INDY7_2D_JOINTS = [
-    # base->joint1
     Joint2D(
-        name = "joint1",
+        name = "joint0",#base
         lenth = INDY7_JOINTS[0].len_val + INDY7_JOINTS[1].len_val
     ),
     Joint2D(
-            name = "joint2",
-            lenth = INDY7_JOINTS[2].len_val,
-            mass = INDY7_JOINTS[2].mass 
-        ),
+        name = "joint1",
+        lenth = INDY7_JOINTS[2].len_val,
+        mass = INDY7_JOINTS[2].mass 
+    ),
     Joint2D(
-            name = "joint3",
-            lenth =  INDY7_JOINTS[3].len_val + INDY7_JOINTS[4].len_val,
-            mass = INDY7_JOINTS[3].mass + INDY7_JOINTS[4].mass
-        ),
+        name = "joint2",
+        lenth =  INDY7_JOINTS[3].len_val + INDY7_JOINTS[4].len_val,
+        mass = INDY7_JOINTS[3].mass + INDY7_JOINTS[4].mass
+    ),
     Joint2D(
-            name = "tcp",
-            lenth = INDY7_JOINTS[5].len_val + TCP_OFFSET,
-            mass = INDY7_JOINTS[5].mass
-        )
+        name = "joint3",
+        lenth = INDY7_JOINTS[5].len_val + TCP_OFFSET,
+        mass = INDY7_JOINTS[5].mass
+    )
 ]
 
 print(f"base= {INDY7_2D_JOINTS[0].lenth}, L1= {INDY7_2D_JOINTS[1].lenth}, L2= {INDY7_2D_JOINTS[2].lenth}, L3= {INDY7_2D_JOINTS[3].lenth}")

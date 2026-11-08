@@ -1,5 +1,6 @@
+from typing import Tuple, Optional, Dict, Any
 import numpy as np
-from Indy7_2D3DOF import INDY7_2D_JOINTS, compute_regressor
+from Indy7_2D3DOF import INDY7_2D_JOINTS, compute_regressor, compute_torque
 
 def trajectory_evaluator(
     fourier_coeffs_21 : np.ndarray,
@@ -63,7 +64,7 @@ def compute_condition_number(
 
     Y_all = np.zeros((3 * N, 4))
     for i in range(N):
-        Y_all[3*i:3*i+3,:] = compute_regressor(q[i], qdot[i], qddot[i])
+        Y_all[3 * i : 3 * i + 3, :] = compute_regressor(q[i], qdot[i], qddot[i])
 
     eigen_values = np.linalg.eigvalsh(Y_all.T @ Y_all) #고유값 자동 정렬 작은거->큰거
     sigmas = np.sqrt(np.clip(eigen_values, 0.0, None))
@@ -75,8 +76,61 @@ def compute_condition_number(
 
 #제약조건
 def evaluate_constraints(
-        
-)
+    fourier_coeffs: np.ndarray,
+    time_step: float = 0.01,
+    period: float = 10.0
+) -> np.ndarray:
+    """
+    최적화 솔버(SLSQP 등)를 위한 궤적 부등호 제약조건 평가 함수.
+    모든 잔차가 >= 0 이면 제약조건 만족(Feasible), < 0 이면 위반(Infeasible).
+    
+    제약조건 구성 (총 15개 잔차):
+      1) 각도 상한: q_max - max(q) >= 0 (3개)
+      2) 각도 하한: min(q) - q_min >= 0 (3개)
+      3) 각속도 상한: qdot_max - max(|qdot|) >= 0 (3개)
+      4) 각가속도 상한: qddot_max - max(|qddot|) >= 0 (3개)
+      5) 토크 상한 (0.8배 안전율): torque_max - max(|torque|) >= 0 (3개)
+    """
+    _, q, qdot, qddot = trajectory_evaluator(fourier_coeffs, time_step, period)
+    N = len(q)
+
+    # 인디7 하드웨어 규격 (URDF 기반)
+    # 2D 관절 1(Shoulder), 관절 2(Elbow), 관절 3(Wrist)
+    q_max = np.array([3.0543, 3.0543, 3.0543])    # +-175 deg
+    q_min = -q_max
+    qdot_max = np.array([2.618, 2.618, 3.142])    # [150, 150, 180] deg/s
+    qddot_max = np.array([5.0, 5.0, 5.0])         # rad/s^2 안전 상한
+
+    # 피크 토크의 0.8배 (안전율 약 1.25, 20% 마진)
+    # URDF effort: [431.97, 197.23, 79.79] N*m
+    torque_max = np.array([431.97, 197.23, 79.79]) * 0.8
+
+    # 시간 스텝별 구동 토크 계산
+    torques = np.zeros((N, 3))
+    for k in range(N):
+        torques[k] = compute_torque(q[k], qdot[k], qddot[k])
+
+    # axis=0 축 연산을 통한 관절별 최댓값/최솟값 집계
+    max_q = np.max(q, axis=0)
+    min_q = np.min(q, axis=0)
+    max_qdot = np.max(np.abs(qdot), axis=0)
+    max_qddot = np.max(np.abs(qddot), axis=0)
+    max_torque = np.max(np.abs(torques), axis=0)
+
+    # 잔차 계산 (허용 한계치 - 실제 최댓값 >= 0)
+    res_q_upper = q_max - max_q
+    res_q_lower = min_q - q_min
+    res_qdot = qdot_max - max_qdot
+    res_qddot = qddot_max - max_qddot
+    res_torque = torque_max - max_torque
+
+    return np.concatenate([
+        res_q_upper,
+        res_q_lower,
+        res_qdot,
+        res_qddot,
+        res_torque
+    ])
 
 #메인함수(위에것들 묶어서 최적화된 궤적 생성)
     # 매 스탭 제약 조건에서 위반시 해당 조건에 대해 음수 잔차 반환-> 경사강하법으로 재생성
@@ -93,3 +147,7 @@ if __name__ == "__main__":
 
     cond = compute_condition_number(coeffs)
     print(f"조건수: {cond:.2f}")
+
+    constraints = evaluate_constraints(coeffs)
+    print(f"제약조건 잔차 개수: {len(constraints)}개 (모두 >= 0 이어야 만족)")
+    print(f"제약조건 위반 개수 (음수 잔차): {np.sum(constraints < 0)}개")
