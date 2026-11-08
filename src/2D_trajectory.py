@@ -87,10 +87,10 @@ def evaluate_constraints(
     _, q, qdot, qddot = trajectory_evaluator(fourier_coeffs_21, time_step, period)
     N = len(q)
 
-    q_max = np.array([j.q_max for j in INDY7_2D_JOINTS[1:]])
-    q_min = np.array([j.q_min for j in INDY7_2D_JOINTS[1:]])
-    qdot_max = np.array([j.qdot_max for j in INDY7_2D_JOINTS[1:]])
-    torque_max = np.array([j.effort for j in INDY7_2D_JOINTS[1:]])
+    q_max = np.array([0.8*j.q_max for j in INDY7_2D_JOINTS[1:]])
+    q_min = np.array([0.8*j.q_min for j in INDY7_2D_JOINTS[1:]])
+    qdot_max = np.array([0.8*j.qdot_max for j in INDY7_2D_JOINTS[1:]])
+    torque_max = np.array([0.8*j.effort for j in INDY7_2D_JOINTS[1:]])
 
     margin_q_upper = ((q_max - q) / q_max).flatten()
     margin_q_lower = ((q - q_min) / np.abs(q_min)).flatten()
