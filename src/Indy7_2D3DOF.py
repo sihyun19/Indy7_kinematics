@@ -18,7 +18,7 @@ class Joint2D:
     q_limit_upper : float = 0.0
     q_limit_lower : float = 0.0 
     qdot_limit : float = 0.0 
-    effort : float = 0.0 
+    effort : float = 0.0
 
 INDY7_2D_JOINTS = [
     Joint2D(
