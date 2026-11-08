@@ -82,44 +82,14 @@ def evaluate_constraints(
     fourier_coeffs_21: np.ndarray,
     time_step: float = 0.02,
     period: float = 10.0,
-    test_payload: Optional[np.ndarray] = None
-) -> Dict[str, float]:
-    """
-    로봇 기계적 제약 조건 마진 계산
-    """
-    if test_payload is None:
-        test_payload = np.array([2.5, 0.04, -0.02, 0.015])
-
+) -> float:
+  
     _, q, qdot, qddot = trajectory_evaluator(fourier_coeffs_21, time_step, period)
     N = len(q)
 
-    joints = INDY7_2D_JOINTS[1:]
-    q_max = np.array([j.q_limit_upper for j in joints])
-    qdot_max = np.array([j.qdot_limit for j in joints])
-    effort_max = np.array([j.effort for j in joints])
+   
 
-    margin_q = np.min(q_max - np.max(np.abs(q), axis=0))
-    margin_qdot = np.min(qdot_max - np.max(np.abs(qdot), axis=0))
-
-    torques = np.zeros((N, 3))
-    for i in range(N):
-        torques[i] = compute_torque(q[i], qdot[i], qddot[i], payload_params=test_payload)
-    margin_effort = np.min(effort_max - np.max(np.abs(torques), axis=0))
-
-    y_coords = []
-    for i in range(N):
-        _, _, p3 = forward_kinematics(q[i])
-        y_coords.append(p3[1])
-    margin_floor = float(np.min(y_coords) - 0.05)
-
-    return {
-        "margin_q": float(margin_q),
-        "margin_qdot": float(margin_qdot),
-        "margin_effort": float(margin_effort),
-        "margin_floor": float(margin_floor),
-        "is_valid": bool(margin_q > 0 and margin_qdot > 0 and margin_effort > 0 and margin_floor > 0)
-    }
-
+    return 0
 
 if __name__ == "__main__":
     coeffs = np.array([
@@ -136,6 +106,3 @@ if __name__ == "__main__":
 
     cond = compute_condition_number(coeffs)
     print(f"조건수: {cond:.2f}")
-
-    margin_info = evaluate_constraints(coeffs)
-    print(f"제약조건 충족 여부: {margin_info['is_valid']}")
