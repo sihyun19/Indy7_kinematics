@@ -1,42 +1,81 @@
 from dataclasses import dataclass, field
-from typing import List
+from typing import List, Tuple, Optional
 import numpy as np
 import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 from config.indy7_dimensions import Joint, INDY7_JOINTS, TCP_OFFSET, TCP_DIR
 
-#파라미터 정리
+# 파라미터 정리
 @dataclass
 class Joint2D:
     name: str
     lenth: float
     lenth_dir: np.ndarray | None = None
-    l_com: float=0.5
+    l_com: float = 0.5
     mass: float = 0.0
-    inertia_zz : float = 2.0
+    inertia_zz: float = 2.0
+    q_limit_upper: float = 3.0543
+    q_limit_lower: float = -3.0543
+    qdot_limit: float = 2.6180
+    effort: float = 431.97
 
 INDY7_2D_JOINTS = [
     Joint2D(
-        name = "joint0",#base
-        lenth = INDY7_JOINTS[0].len_val + INDY7_JOINTS[1].len_val
+        name="joint0",  # base
+        lenth=INDY7_JOINTS[0].len_val + INDY7_JOINTS[1].len_val,
+        q_limit_upper=0.0,
+        q_limit_lower=0.0,
+        qdot_limit=0.0,
+        effort=431.97
     ),
     Joint2D(
-        name = "joint1",
-        lenth = INDY7_JOINTS[2].len_val,
-        mass = INDY7_JOINTS[2].mass 
+        name="joint1",
+        lenth=INDY7_JOINTS[2].len_val,
+        mass=INDY7_JOINTS[2].mass,
+        q_limit_upper=3.0543,
+        q_limit_lower=-3.0543,
+        qdot_limit=2.6180,
+        effort=431.97
     ),
     Joint2D(
-        name = "joint2",
-        lenth =  INDY7_JOINTS[3].len_val + INDY7_JOINTS[4].len_val,
-        mass = INDY7_JOINTS[3].mass + INDY7_JOINTS[4].mass
+        name="joint2",
+        lenth=INDY7_JOINTS[3].len_val + INDY7_JOINTS[4].len_val,
+        mass=INDY7_JOINTS[3].mass + INDY7_JOINTS[4].mass,
+        q_limit_upper=3.0543,
+        q_limit_lower=-3.0543,
+        qdot_limit=2.6180,
+        effort=197.23
     ),
     Joint2D(
-        name = "joint3",
-        lenth = INDY7_JOINTS[5].len_val + TCP_OFFSET,
-        mass = INDY7_JOINTS[5].mass
+        name="joint3",
+        lenth=INDY7_JOINTS[5].len_val + TCP_OFFSET,
+        mass=INDY7_JOINTS[5].mass,
+        q_limit_upper=3.0543,
+        q_limit_lower=-3.0543,
+        qdot_limit=3.1416,
+        effort=79.79
     )
 ]
+
+DEFAULT_FRICTION_PARAMS = np.array([1.25, 1.80, 0.85, 1.20, 0.45, 0.65])
+
+
+def forward_kinematics(q: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """
+    2D 3자유도 순기구학 (각 관절 및 엔드이펙터 2D 좌표 반환)
+    기준 좌표계: Base 관절 위치 (0, L0)
+    """
+    L0 = INDY7_2D_JOINTS[0].lenth
+    L = np.array([j.lenth for j in INDY7_2D_JOINTS[1:]])
+    phi = np.cumsum(q)
+    T = np.column_stack([-np.sin(phi), np.cos(phi)])
+
+    p0 = np.array([0.0, L0])
+    p1 = p0 + L[0] * T[0]
+    p2 = p1 + L[1] * T[1]
+    p3 = p2 + L[2] * T[2]
+    return p1, p2, p3
 
 print(f"base= {INDY7_2D_JOINTS[0].lenth}, L1= {INDY7_2D_JOINTS[1].lenth}, L2= {INDY7_2D_JOINTS[2].lenth}, L3= {INDY7_2D_JOINTS[3].lenth}")
 
