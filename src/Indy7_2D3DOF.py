@@ -15,9 +15,9 @@ class Joint2D:
     l_com: float=0.5
     mass: float = 0.0
     inertia_zz : float = 2.0
-    q_limit_upper : float = 0.0
-    q_limit_lower : float = 0.0 
-    qdot_limit : float = 0.0 
+    q_max : float = 0.0
+    q_min : float = 0.0 
+    qdot_max : float = 0.0 
     effort : float = 0.0
 
 INDY7_2D_JOINTS = [
@@ -29,33 +29,30 @@ INDY7_2D_JOINTS = [
         name = "joint1",
         lenth = INDY7_JOINTS[2].len_val,
         mass = INDY7_JOINTS[2].mass,
-        q_limit_upper = 3.0543261909900767,
-        q_limit_lower = -3.0543261909900767,
-        qdot_limit = 2.6179938779914944,
+        q_max = 3.0543261909900767,
+        q_min = -3.0543261909900767,
+        qdot_max = 2.6179938779914944,
         effort = 431.97
     ),
     Joint2D(
         name = "joint2",
         lenth =  INDY7_JOINTS[3].len_val + INDY7_JOINTS[4].len_val,
         mass = INDY7_JOINTS[3].mass + INDY7_JOINTS[4].mass,
-        q_limit_upper = 3.0543261909900767,
-        q_limit_lower = -3.0543261909900767,
-        qdot_limit = 2.6179938779914944,
+        q_max = 3.0543261909900767,
+        q_min = -3.0543261909900767,
+        qdot_max = 2.6179938779914944,
         effort = 197.23
     ),
     Joint2D(
         name = "joint3",
         lenth = INDY7_JOINTS[5].len_val + TCP_OFFSET,
         mass = INDY7_JOINTS[5].mass,
-        q_limit_upper = 3.0543261909900767,
-        q_limit_lower = -3.0543261909900767,
-        qdot_limit = 3.141592653589793,
+        q_max = 3.0543261909900767,
+        q_min = -3.0543261909900767,
+        qdot_max = 3.141592653589793,
         effort = 79.79
     )
 ]
-
-DEFAULT_FRICTION_PARAMS = np.array([1.25, 1.80, 0.85, 1.20, 0.45, 0.65])
-
 
 def forward_kinematics(q: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """

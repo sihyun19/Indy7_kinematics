@@ -1,6 +1,6 @@
 from typing import Tuple, Optional, Dict, Any
 import numpy as np
-from Indy7_2D3DOF import INDY7_2D_JOINTS, compute_torque, compute_regressor, forward_kinematics
+from Indy7_2D3DOF import INDY7_2D_JOINTS, compute_torque, compute_regressor
 
 def trajectory_evaluator(
     fourier_coeffs_21 : np.ndarray,
@@ -77,19 +77,30 @@ def compute_condition_number(
     cond_Y_all = sigmas[-1] / sigmas[0]
     return float(cond_Y_all)
 
-# 제약조건
+# 제약조건, 다운샘플링 후 12*200=2400 벡터  출력
 def evaluate_constraints(
     fourier_coeffs_21: np.ndarray,
-    time_step: float = 0.02,
+    time_step: float = 0.05,
     period: float = 10.0,
-) -> float:
+) -> np.ndarray:
   
     _, q, qdot, qddot = trajectory_evaluator(fourier_coeffs_21, time_step, period)
     N = len(q)
 
-   
+    q_max = np.array([j.q_max for j in INDY7_2D_JOINTS[1:]])
+    q_min = np.array([j.q_min for j in INDY7_2D_JOINTS[1:]])
+    qdot_max = np.array([j.qdot_max for j in INDY7_2D_JOINTS[1:]])
+    torque_max = np.array([j.effort for j in INDY7_2D_JOINTS[1:]])
 
-    return 0
+    margin_q_upper = ((q_max - q) / q_max).flatten()
+    margin_q_lower = ((q - q_min) / np.abs(q_min)).flatten()
+    margin_qdot    = ((qdot_max - np.abs(qdot)) / qdot_max).flatten()
+    torque_all =   np.zeros((N, 3))
+    for i in range(N):
+        torque_all[i,:] = compute_torque(q[i], qdot[i], qddot[i])
+    margin_torque  = ((torque_max - np.abs(torque_all)) / torque_max).flatten()
+        
+    return np.concatenate([margin_q_upper, margin_q_lower, margin_qdot, margin_torque])
 
 if __name__ == "__main__":
     coeffs = np.array([
@@ -106,3 +117,8 @@ if __name__ == "__main__":
 
     cond = compute_condition_number(coeffs)
     print(f"조건수: {cond:.2f}")
+
+    # 제약조건 벡터 검증
+    c_vals = evaluate_constraints(coeffs)
+    print(f"제약조건 벡터 형태: {c_vals.shape}") # (2400,)
+    print(f"최소 마진(음수면 위반): {np.min(c_vals):.4f}")
