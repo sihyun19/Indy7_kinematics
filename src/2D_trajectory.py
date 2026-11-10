@@ -1,7 +1,11 @@
-from typing import Tuple, Optional, Dict, Any
+'''
+SLSQP솔버
+'''
 import numpy as np
 from Indy7_2D3DOF import INDY7_2D_JOINTS, compute_torque, compute_regressor
+from scipy.optimize import minimize
 
+# 푸리에 계수에 따른 q, qdot, qddot 행렬 생성
 def trajectory_evaluator(
     fourier_coeffs_21 : np.ndarray,
     #[ 관절 1 (7개) ]
@@ -15,7 +19,7 @@ def trajectory_evaluator(
     # index 18 ~ 20 : b_3,1 ~ b_3,3 (관절 3의 cos 계수 3개)
     time_step : float = 0.01,
     period : float = 10.0, #기본 각주파수 기본 2pi/(10s)= 0.628rad/s
-    q0 : Optional[np.ndarray] = None
+    q0 : np.ndarray | None = None
 )-> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     if q0 is None:
         q0 = np.array([0.0, 0.5, -0.5])
@@ -52,6 +56,7 @@ def trajectory_evaluator(
     
     return Time_vec, q, qdot, qddot   
 
+# 목적함수 역할
 def compute_condition_number(
     fourier_coeffs: np.ndarray,
     time_step: float = 0.01, 
@@ -77,10 +82,10 @@ def compute_condition_number(
     cond_Y_all = sigmas[-1] / sigmas[0]
     return float(cond_Y_all)
 
-# 제약조건, 다운샘플링 후 12*200=2400 벡터  출력
+# 제약조건, 다운샘플링 후 12*50=600 벡터  출력
 def evaluate_constraints(
     fourier_coeffs_21: np.ndarray,
-    time_step: float = 0.05,
+    time_step: float = 0.2,
     period: float = 10.0,
 ) -> np.ndarray:
   
@@ -102,23 +107,75 @@ def evaluate_constraints(
         
     return np.concatenate([margin_q_upper, margin_q_lower, margin_qdot, margin_torque])
 
+# SLSQP솔버 조립
+def slsqp(
+    coeffs_21: np.ndarray | None = None,
+    maxiter: int = 100,
+    eps: float = 1e-4,
+    ftol: float = 1e-4
+):
+    if coeffs_21 is None:
+        coeffs_21 = np.array([
+                0.042, -0.038,  0.025, -0.012,  0.035, -0.028,  0.018,
+                0.035,  0.045, -0.022,  0.015, -0.028,  0.032, -0.014,
+               -0.028,  0.032,  0.038, -0.016,  0.022, -0.025,  0.012
+            ])
+    t, q, qdot, qddot = trajectory_evaluator(coeffs_21)
+
+    count = 0
+    def print_count(xk):
+        nonlocal count
+        count += 1
+        current_cond = compute_condition_number(xk)
+        print(f"  [반복 {count:2d}] 현재 조건수: {current_cond:.4f}")
+
+    result = minimize(
+        fun = compute_condition_number,
+        x0 = coeffs_21,
+        method = 'SLSQP',
+        constraints = { 'type' : 'ineq', 'fun' : evaluate_constraints },
+        callback = print_count,
+        options= {
+            'maxiter': maxiter,
+            'disp': True,
+            'eps': eps,
+            'ftol': ftol
+        }
+    )
+    return result
+    
 if __name__ == "__main__":
-    coeffs = np.array([
+    print(f"--------test--------")
+    coeffs_test = np.array([
         0.042, -0.038,  0.025, -0.012,  0.035, -0.028,  0.018,
         0.035,  0.045, -0.022,  0.015, -0.028,  0.032, -0.014,
        -0.028,  0.032,  0.038, -0.016,  0.022, -0.025,  0.012
     ])
-    t, q, qdot, qddot = trajectory_evaluator(coeffs)
+    t_test, q_test, qdot_test, qddot_test = trajectory_evaluator(coeffs_test)
+    
     
     # q를 수치 미분한 값과 수식으로 구한 qdot 비교
-    qdot_numerical = np.gradient(q[:, 0], t)
-    diff = np.max(np.abs(qdot[:, 0] - qdot_numerical))
+    qdot_test_numerical = np.gradient(q_test[:, 0], t_test)
+    diff = np.max(np.abs(qdot_test[:, 0] - qdot_test_numerical))
     print(f"속도 수식 최대 오차: {diff:.2e}")
 
-    cond = compute_condition_number(coeffs)
+    cond = compute_condition_number(coeffs_test)
     print(f"조건수: {cond:.2f}")
 
     # 제약조건 벡터 검증
-    c_vals = evaluate_constraints(coeffs)
-    print(f"제약조건 벡터 형태: {c_vals.shape}") # (2400,)
-    print(f"최소 마진(음수면 위반): {np.min(c_vals):.4f}")
+    c_vals_test = evaluate_constraints(coeffs_test)
+    print(f"제약조건 벡터 형태: {c_vals_test.shape}") # (2400,)
+    print(f"최소 마진(음수면 위반): {np.min(c_vals_test):.4f}")
+
+    print(f"--------실행--------")
+    res= slsqp(coeffs_test)
+    print(f"성공 여부      : {res.success}")
+    print(f"--------결과--------")
+    if res.success:
+        
+        
+        print(f"반복횟수       : {res.nit:.f}")
+        print(f"최적화 벡터     : {res.x:.f}")
+        print(f"최적화 조건수   : {res.fun:.f}")
+    else:
+        print(f"최적화 실패: {res.message}")
