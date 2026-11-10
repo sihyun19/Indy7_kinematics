@@ -1,6 +1,7 @@
 '''
 SLSQP솔버
 '''
+import os
 import numpy as np
 from Indy7_2D3DOF import INDY7_2D_JOINTS, compute_torque, compute_regressor
 from scipy.optimize import minimize
@@ -82,10 +83,10 @@ def compute_condition_number(
     cond_Y_all = sigmas[-1] / sigmas[0]
     return float(cond_Y_all)
 
-# 제약조건, 다운샘플링 후 12*50=600 벡터  출력
+# 제약조건, 다운샘플링 후 12*200=2400 벡터  출력
 def evaluate_constraints(
     fourier_coeffs_21: np.ndarray,
-    time_step: float = 0.2,
+    time_step: float = 0.05,
     period: float = 10.0,
 ) -> np.ndarray:
   
@@ -128,6 +129,7 @@ def slsqp(
         count += 1
         current_cond = compute_condition_number(xk)
         print(f"  [반복 {count:2d}] 현재 조건수: {current_cond:.4f}")
+        np.save("temp_coeffs.npy", xk)
 
     result = minimize(
         fun = compute_condition_number,
@@ -173,9 +175,11 @@ if __name__ == "__main__":
     print(f"--------결과--------")
     if res.success:
         
-        
-        print(f"반복횟수       : {res.nit:.f}")
-        print(f"최적화 벡터     : {res.x:.f}")
+        np.save("optimized_coeffs.npy", res.x)
+        np.savetxt("optimized_coeffs.txt", res.x, fmt="%.8f")
+        print("최적화 계수가 'optimized_coeffs.npy' 및 'optimized_coeffs.txt'에 저장되었습니다.")
+        print(f"반복횟수       : {res.nit}")
         print(f"최적화 조건수   : {res.fun:.f}")
+        print(f"최적화 벡터     :\n{np.array2string(res.x, precision=6, separator=', ')}")
     else:
         print(f"최적화 실패: {res.message}")
