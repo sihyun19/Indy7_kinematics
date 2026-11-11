@@ -54,9 +54,9 @@ INDY7_2D_JOINTS = [
     )
 ]
 
-def forward_kinematics(q: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+def fk_2D(q: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
-    2D 3자유도 순기구학 (각 관절 및 엔드이펙터 2D 좌표 반환)
+    2D 3자유도 순기구학 (각 관절 2D 좌표 반환)
     기준 좌표계: Base 관절 위치 (0, L0)
     """
     L0 = INDY7_2D_JOINTS[0].lenth

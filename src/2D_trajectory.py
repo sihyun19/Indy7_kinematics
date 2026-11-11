@@ -3,7 +3,7 @@ SLSQP솔버
 '''
 import os
 import numpy as np
-from Indy7_2D3DOF import INDY7_2D_JOINTS, compute_torque, compute_regressor
+from Indy7_2D3DOF import INDY7_2D_JOINTS, fk_2D, compute_torque, compute_regressor
 from scipy.optimize import minimize
 
 # 푸리에 계수에 따른 q, qdot, qddot 행렬 생성
@@ -86,7 +86,7 @@ def compute_condition_number(
 # 제약조건, 다운샘플링 후 12*200=2400 벡터  출력
 def evaluate_constraints(
     fourier_coeffs_21: np.ndarray,
-    time_step: float = 0.05,
+    time_step: float = 0.1,
     period: float = 10.0,
 ) -> np.ndarray:
   
@@ -145,7 +145,28 @@ def slsqp(
         }
     )
     return result
-    
+
+def save(optimized_coeffs):
+    np.save("optimized_coeffs.npy", optimized_coeffs)
+    np.savetxt("optimized_coeffs.txt", optimized_coeffs, fmt="%.8f")
+    print("최적화 계수가 'optimized_coeffs.npy' 및 'optimized_coeffs.txt'에 저장되었습니다.")
+    Time_vec, q, qdot, qddot  = trajectory_evaluator(optimized_coeffs)
+    N = len(q)
+    torque =   np.zeros((N, 3))
+    for i in range(N):
+        torque[i,:] = compute_torque(q[i], qdot[i], qddot[i])
+    np.savez("optimized_trajectory.npz", time=Time_vec, q =q, qdot=qdot, qddot=qddot, torque=torque)
+    trajectory_data = np.column_stack([Time_vec[:, None], q, qdot, qddot,torque])
+    header_str = "time, q1, q2, q3, qdot1, qdot2, qdot3, qddot1, qddot2, qddot3, torque1, torque2, torque3"
+    np.savetxt("optimized_trajectory.txt", trajectory_data, fmt="%.8f",delimiter=", ",header=header_str)
+    print("최적화 경로가 'optimized_trajectory.npz' 및 'optimized_trajectory.txt'에 저장되었습니다.")
+    is_valid = np.all(evaluate_constraints(optimized_coeffs, 0.01) >= -1e-3)
+    print(f"제약조건 만족 여부(여유 20%): {is_valid}")
+    print(f"q_min        : {np.min(q, axis=0)}")
+    print(f"q_max        : {np.max(q, axis=0)}")
+    print(f"|qdot|_max   : {np.max(np.abs(qdot), axis=0)}")
+    print(f"|torque|_max : {np.max(np.abs(torque), axis=0)}")
+
 if __name__ == "__main__":
     print(f"--------test--------")
     coeffs_test = np.array([
@@ -171,15 +192,8 @@ if __name__ == "__main__":
 
     print(f"--------실행--------")
     res= slsqp(coeffs_test)
-    print(f"성공 여부      : {res.success}")
-    print(f"--------결과--------")
     if res.success:
+        save(res.x)
         
-        np.save("optimized_coeffs.npy", res.x)
-        np.savetxt("optimized_coeffs.txt", res.x, fmt="%.8f")
-        print("최적화 계수가 'optimized_coeffs.npy' 및 'optimized_coeffs.txt'에 저장되었습니다.")
-        print(f"반복횟수       : {res.nit}")
-        print(f"최적화 조건수   : {res.fun:.4f}")
-        print(f"최적화 벡터     :\n{np.array2string(res.x, precision=6, separator=', ')}")
     else:
         print(f"최적화 실패: {res.message}")

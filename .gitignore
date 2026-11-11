@@ -11,3 +11,5 @@ data/raw_matlab/*.mat
 temp_coeffs.npy
 optimized_coeffs.npy
 optimized_coeffs.txt
+optimized_trajectory.npz
+optimized_trajectory.txt
