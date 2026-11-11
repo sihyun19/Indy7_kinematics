@@ -191,6 +191,39 @@
             font-weight: bold;
             font-variant-numeric: tabular-nums;
         }
+        .traj-panel {
+            background: #f4f4f5;
+            border: 1px solid #d4d4d8;
+            border-radius: 6px;
+            padding: 10px;
+            margin-bottom: 12px;
+        }
+        .traj-select-row {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .traj-label {
+            font-size: 11px;
+            font-weight: bold;
+            color: #52525b;
+        }
+        .traj-dropdown {
+            width: 100%;
+            height: 28px;
+            padding: 2px 6px;
+            font-size: 12px;
+            font-family: Arial, sans-serif;
+            color: #000000;
+            background-color: #ffffff;
+            border: 1px solid #71717a;
+            border-radius: 4px;
+            outline: none;
+            cursor: pointer;
+}
+.traj-dropdown:focus {
+    border-color: #000000;
+}
     </style>
     <!-- Three.js 및 필수 부가 라이브러리 CDN -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -261,6 +294,22 @@
             <button id="cam-front" class="btn-cam" title="XZ 평면 정면도">Front</button>
             <button id="cam-side" class="btn-cam" title="YZ 평면 측면도">Side</button>
             <button id="cam-iso" class="btn-cam" title="등각 투영 기본 뷰">Iso</button>
+        </div>
+        
+        <!-- 궤적 선택 및 재생 제어 섹션 -->
+        <div class="traj-panel">
+            <div class="box-title">Trajectory Control</div>
+            <div class="traj-select-row">
+                <label for="traj-select" class="traj-label">Trajectory</label>
+                <select id="traj-select" class="traj-dropdown">
+                    <option value="" disabled selected>궤적 선택...</option>
+                </select>
+            </div>
+    
+            <div class="btn-group" style="margin-top: 8px;">
+                <button id="btn-traj-play" class="btn btn-primary" disabled>▶</button>
+                <button id="btn-traj-reset" class="btn btn-secondary" disabled>⏮</button>
+            </div>
         </div>
 
         <div class="pose-container">

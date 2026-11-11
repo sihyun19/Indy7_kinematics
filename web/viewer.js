@@ -5,6 +5,12 @@ let linkMeshes = [];
 let tcpAxesHelper = null;
 let isUpdating = false;
 let pendingAngles = null;
+// 궤적 재생 관련 상태
+let trajData = null;
+let isTrajPlaying = false;
+let trajPlayTime = 0.0;
+let lastTimestamp = 0;
+let tcpTrailLine = null;
 
 let isTransitioningCamera = false;
 const targetCamPos = new THREE.Vector3();
@@ -103,6 +109,8 @@ function init() {
         .catch((err) => {
             console.error('메쉬 로드 실패:', err);
         });
+    //에니메이션 불러오기
+    loadTrajectoryList();
 
     animate();
 }
@@ -180,6 +188,7 @@ function setupUIEventListeners() {
             slider.value = val;
             onAngleChanged();
         });
+    
     }
 
     const btnHome = document.getElementById('btn-home');
@@ -207,6 +216,26 @@ function setupUIEventListeners() {
             });
         }
     });
+
+    // 궤적 드롭다운 선택 이벤트
+    const trajSelect = document.getElementById('traj-select');
+    if (trajSelect) {
+        trajSelect.addEventListener('change', (e) => {
+            loadTrajectoryData(e.target.value);
+        });
+    }
+
+    // 재생 / 일시정지 버튼
+    const btnPlay = document.getElementById('btn-traj-play');
+    if (btnPlay) {
+        btnPlay.addEventListener('click', toggleTrajectoryPlay);
+    }
+
+    // 리셋 버튼
+    const btnReset = document.getElementById('btn-traj-reset');
+    if (btnReset) {
+        btnReset.addEventListener('click', resetTrajectory);
+    }
 }
 
 function setCameraPreset(presetKey) {
@@ -315,8 +344,31 @@ function onWindowResize() {
     renderer.setSize(window.innerWidth, window.innerHeight);
 }
 
-function animate() {
+function animate(timestamp) {
     requestAnimationFrame(animate);
+
+    if (!lastTimestamp) lastTimestamp = timestamp;
+    const dt = (timestamp - lastTimestamp) / 1000.0;
+    lastTimestamp = timestamp;
+
+    // 궤적 애니메이션 재생 중일 때
+    if (isTrajPlaying && trajData && trajData.times.length > 0) {
+        trajPlayTime += dt;
+        const totalDuration = trajData.times[trajData.times.length - 1];
+
+        if (trajPlayTime >= totalDuration) {
+            trajPlayTime = totalDuration;
+            isTrajPlaying = false;
+            const btnPlay = document.getElementById('btn-traj-play');
+            if (btnPlay) btnPlay.textContent = '▶';
+        }
+
+        // 현재 시간에 해당하는 스텝 인덱스 찾기
+        const N = trajData.times.length;
+        const ratio = Math.min(1.0, trajPlayTime / totalDuration);
+        const index = Math.min(Math.floor(ratio * (N - 1)), N - 1);
+        applyTrajectoryFrame(index);
+    }
 
     if (isTransitioningCamera) {
         camera.position.lerp(targetCamPos, 0.08);
@@ -334,4 +386,123 @@ function animate() {
     renderer.render(scene, camera);
 }
 
+async function loadTrajectoryList() {
+    const select = document.getElementById('traj-select');
+    try {
+        const res = await fetch('/api/trajectories');
+        if (!res.ok) throw new Error('목록을 불러오지 못했습니다.');
+        const files = await res.json();
+        
+        select.innerHTML = '<option value="" disabled selected>궤적 선택...</option>';
+        files.forEach(file => {
+            const opt = document.createElement('option');
+            opt.value = file;
+            opt.textContent = file;
+            select.appendChild(opt);
+        });
+    } catch (err) {
+        console.warn('궤적 목록 로드 실패:', err);
+    }
+}
+
+// 선택된 궤적 데이터 불러오기
+async function loadTrajectoryData(filename) {
+    try {
+        const res = await fetch(`/api/trajectory?file=${encodeURIComponent(filename)}`);
+        if (!res.ok) throw new Error('궤적 데이터를 불러오지 못했습니다.');
+        trajData = await res.json();
+
+        // 버튼 활성화
+        document.getElementById('btn-traj-play').disabled = false;
+        document.getElementById('btn-traj-reset').disabled = false;
+
+        // TCP 궤적 선(Trail) 씬에 렌더링
+        drawTcpTrail(trajData.tcp);
+
+        // 첫 프레임 상태로 로봇 배치
+        resetTrajectory();
+    } catch (err) {
+        console.error('궤적 로드 실패:', err);
+    }
+}
+
+// 말단(TCP) 이동 경로 3D 라인 생성
+function drawTcpTrail(tcpPoints) {
+    if (tcpTrailLine) {
+        scene.remove(tcpTrailLine);
+        tcpTrailLine.geometry.dispose();
+        tcpTrailLine.material.dispose();
+        tcpTrailLine = null;
+    }
+
+    const points = tcpPoints.map(p => new THREE.Vector3(p[0], p[1], p[2]));
+    const geometry = new THREE.BufferGeometry().setFromPoints(points);
+    const material = new THREE.LineBasicMaterial({ color: 0x2563eb, linewidth: 2 });
+    tcpTrailLine = new THREE.Line(geometry, material);
+    scene.add(tcpTrailLine);
+}
+
+// 특정 인덱스의 포즈를 로봇에 반영
+function applyTrajectoryFrame(index) {
+    if (!trajData) return;
+    const mats = trajData.matrices[index];
+    const dummyMat = new THREE.Matrix4();
+
+    linkMeshes.forEach((mesh, i) => {
+        if (mats[i]) {
+            dummyMat.fromArray(mats[i]);
+            mesh.matrix.copy(dummyMat);
+        }
+    });
+
+    // TCP 좌표 및 슬라이더 값 갱신
+    const tcp = trajData.tcp[index];
+    if (tcp) {
+        const xEl = document.getElementById('tcp-x');
+        const yEl = document.getElementById('tcp-y');
+        const zEl = document.getElementById('tcp-z');
+        if (xEl) xEl.innerText = (tcp[0] * 1000.0).toFixed(1);
+        if (yEl) yEl.innerText = (tcp[1] * 1000.0).toFixed(1);
+        if (zEl) zEl.innerText = (tcp[2] * 1000.0).toFixed(1);
+    }
+
+    // 6자유도 각도 슬라이더 동기화
+    if (trajData.q && trajData.q[index]) {
+        const q_curr = trajData.q[index];
+        let q6Deg = [0, 0, 0, 0, 0, 0];
+        if (q_curr.length === 3) {
+            q6Deg = [0, q_curr[0] * 180 / Math.PI, q_curr[1] * 180 / Math.PI, 0, q_curr[2] * 180 / Math.PI, 0];
+        } else if (q_curr.length === 6) {
+            q6Deg = q_curr.map(v => v * 180 / Math.PI);
+        }
+        setSliderValues(q6Deg);
+    }
+}
+
+// 재생 / 일시정지 토글
+function toggleTrajectoryPlay() {
+    if (!trajData) return;
+    const btnPlay = document.getElementById('btn-traj-play');
+    const totalDuration = trajData.times[trajData.times.length - 1];
+
+    if (trajPlayTime >= totalDuration) {
+        trajPlayTime = 0.0;
+    }
+
+    isTrajPlaying = !isTrajPlaying;
+    if (btnPlay) {
+        btnPlay.textContent = isTrajPlaying ? '⏸' : '▶';
+    }
+}
+
+// 0초 상태로 리셋
+function resetTrajectory() {
+    isTrajPlaying = false;
+    trajPlayTime = 0.0;
+    const btnPlay = document.getElementById('btn-traj-play');
+    if (btnPlay) btnPlay.textContent = '▶';
+    applyTrajectoryFrame(0);
+}
+
+// init() 함수 마지막에 loadTrajectoryList() 호출
 window.onload = init;

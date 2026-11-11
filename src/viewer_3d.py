@@ -48,6 +48,70 @@ class KinematicsRequestHandler(http.server.SimpleHTTPRequestHandler):
             self.send_header('Content-Length', str(len(payload)))
             self.end_headers()
             self.wfile.write(payload)
+        elif parsed.path == '/api/trajectories':
+            traj_dir = os.path.join(PROJECT_ROOT, 'data', 'trajectories')
+            files = []
+            if os.path.exists(traj_dir):
+                # .npz 확장자 파일만 정렬하여 추출
+                files = sorted([f for f in os.listdir(traj_dir) if f.endswith('.npz')])
+            
+            payload = json.dumps(files).encode('utf-8')
+            
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Content-Length', str(len(payload)))
+            self.end_headers()
+            self.wfile.write(payload)
+
+        elif parsed.path == '/api/trajectory':
+            params = urllib.parse.parse_qs(parsed.query)
+            filename = params.get('file', [''])[0]
+            # 상위 디렉터리 접근 방지
+            safe_name = os.path.basename(filename)
+            file_path = os.path.join(PROJECT_ROOT, 'data', 'trajectories', safe_name)
+            
+            if not safe_name or not os.path.exists(file_path):
+                self.send_error(404, "Trajectory file not found")
+                return
+
+            try:
+                data = np.load(file_path)
+                times = data['time'].tolist() if 'time' in data else []
+                q_arr = data['q'] # shape: (N, 3) 또는 (N, 6)
+                N = len(q_arr)
+
+                all_matrices = []
+                all_tcp = []
+
+                for i in range(N):
+                    # 2D 3자유도 궤적일 경우 6D로 확장 [0, q0, q1, 0, q2, 0]
+                    if q_arr.shape[1] == 3:
+                        q6 = np.array([0.0, q_arr[i, 0], q_arr[i, 1], 0.0, q_arr[i, 2], 0.0])
+                    else:
+                        q6 = q_arr[i]
+                    
+                    T_tcp, _, _, _, T_links = fk(q6)
+                    # Three.js column-major 1차원 평탄화
+                    col_mats = [mat.T.flatten().tolist() for mat in T_links]
+                    all_matrices.append(col_mats)
+                    all_tcp.append(T_tcp[:3, 3].tolist())
+
+                payload = json.dumps({
+                    "times": times,
+                    "q": q_arr.tolist(),
+                    "matrices": all_matrices,
+                    "tcp": all_tcp
+                }).encode('utf-8')
+
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json')
+                self.send_header('Content-Length', str(len(payload)))
+                self.end_headers()
+                self.wfile.write(payload)
+
+            except Exception as e:
+                self.send_error(500, f"Error processing trajectory: {str(e)}")
+
         else:
             # HTML, JS, STL 등 정적 파일 기본 서빙
             super().do_GET()
