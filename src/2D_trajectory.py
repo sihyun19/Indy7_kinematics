@@ -179,7 +179,7 @@ if __name__ == "__main__":
         np.savetxt("optimized_coeffs.txt", res.x, fmt="%.8f")
         print("최적화 계수가 'optimized_coeffs.npy' 및 'optimized_coeffs.txt'에 저장되었습니다.")
         print(f"반복횟수       : {res.nit}")
-        print(f"최적화 조건수   : {res.fun:.f}")
+        print(f"최적화 조건수   : {res.fun:.4f}")
         print(f"최적화 벡터     :\n{np.array2string(res.x, precision=6, separator=', ')}")
     else:
         print(f"최적화 실패: {res.message}")

@@ -9,3 +9,5 @@ data/raw_matlab/*.mat
 .venv/
 .council/
 temp_coeffs.npy
+optimized_coeffs.npy
+optimized_coeffs.txt
