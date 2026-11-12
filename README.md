@@ -1,105 +1,48 @@
-# Indy7 2D 3-DOF 평면 구속 협동로봇 페이로드 동역학 파라미터 식별 시스템
+# Indy7 Kinematics
 
-본 프로젝트는 연세대학교 학부연구(2026-2)의 일환으로, 6자유도 협동로봇인 뉴로메카 Indy7을 2D 3자유도(J2, J3, J4) 수직 작업 평면으로 기구학적 구속을 적용하고, 내부 구동 토크 로그만을 활용하여 엔드이펙터에 부착된 비접촉식 페이로드(하중)의 4대 핵심 동역학 파라미터($m, c_x, c_y, I_o$)를 정밀 식별하는 프레임워크입니다.
+학부연구(2026-2). 뉴로메카 Indy7의 기구학·동역학 모델링과, 평면 3자유도로 구속한 모델에서의 엔드이펙터 페이로드 식별용 궤적 최적화.
 
----
+## 진행 현황
 
-## 핵심 연구 성과 및 기능
+| 단계 | 내용 | 상태 |
+|---|---|---|
+| 1 | 순기구학(FK), 자코비안, 3D 웹 뷰어 | 완료 |
+| 2 | 강체 동역학(관성·코리올리·중력) | 완료 |
+| 3 | 2D 3자유도(Indy7의 J2, J3, J5 기준) 토크 모델, 페이로드 4개 파라미터(m, mc_x, mc_y, I_o) 선형 회귀행렬 | 완료 |
+| 4 | 푸리에 급수 궤적 + SLSQP 조건 수 최적화 | 구현 완료, 변수 시작값 난수화 예정 |
+| 5 | 2단계 OLS 페이로드 식별 | 작성 중(`identify_payload.py` 비어 있음) |
 
-1. **2D 3-DOF 평면 기구학 및 역동역학 모델링 (`Indy7_2D3DOF.py`)**:
-   - 도면 및 공식 URDF 기반 링크 치수($L_0=0.3\text{m}, L_1=0.45\text{m}, L_2=0.35\text{m}, L_3=0.228\text{m}$) 및 질량($5.85\text{kg}, 4.81\text{kg}, 2.61\text{kg}$) 정합.
-   - 평행 피치 축(J2 Shoulder, J3 Elbow, J4 Wrist) 구동 및 나머지 관절($0^\circ$) 하드웨어 구속.
-   - 쿨롱 및 점성 마찰 모델($\tau_{\text{fric}} = f_v \dot{q} + f_c \tanh(50\dot{q})$) 반영.
-   - 페이로드 4대 파라미터 선형 회귀행렬 $Y(q, \dot{q}, \ddot{q})$ 선형화 오차 $< 10^{-12}\text{ N}\cdot\text{m}$ (기계 정밀도 검증 통과).
-
-2. **조건수 최소화 5차 푸리에 급수 최적 여기 궤적 (`2D_trajectory.py`)**:
-   - 21개 독립 계수 기반 위치/속도/가속도 연속성 및 초기 정지 경계조건($q(0)=q_0, \dot{q}(0)=0, \ddot{q}(0)=0$) 폐형식 소거.
-   - 관절각($\pm 175^\circ$), 각속도($150\sim 180^\circ/\text{s}$), 최대 토크($431.97, 197.23, 79.79\text{ Nm}$) 마진 보장.
-   - 관측 회귀행렬 특이값 조건수 최적화: $\operatorname{cond}(Y): 135.4 \to 18.2$ ($86.5\%$ 급감).
-
-3. **고신뢰도 신호 전처리 및 2단계 OLS 식별 (`preprocess_sensor_log.py`, `identify_payload.py`)**:
-   - 4차 영위상(Zero-phase) 버터워스 필터(5 Hz 컷오프) + Savitzky-Golay 다항식 평활 미분.
-   - 1단계 무부하 로봇 토크 차감 $\to$ 2단계 선형 최소자승법(OLS) 하중 복원.
-   - 토크 센서 잡음($\sigma=0.25\text{ Nm}$) 환경 하에서 **질량 추정 오차 0.02%**, **결정계수 $R^2 = 0.9958$** 달성.
-
-4. **실시간 모멘텀 관측기 충돌 감지 및 ISO/TS 15066 안전 감시 (`collision_detector.py`, `safety_supervisor.py`)**:
-   - 외력 토크 실시간 관측을 통해 $50\text{ ms}$ 이내 무센서 충돌 감지 및 감속 정지.
-   - 작업자 협동 모드 TCP 선속도($\le 250\text{ mm/s}$), 전체 운동에너지($\le 40\text{ J}$), 토크 상한선 실시간 감시.
-
----
-
-## 디렉터리 구조
+## 구성
 
 ```text
-Indy7_kinematics_sihyun/
-├── config/
-│   └── indy7_dimensions.py        # CAD 기반 링크 치수, 질량, 관성 텐서 정의
-├── docs/
-│   ├── identification_results.png # 3종 검증 그래프 (궤적, 토크, 파라미터 막대)
-│   ├── oral_presentation_script.md # 10분 구두 발표 실전 대본 및 심사위원 Q&A
-│   ├── workspace_dimensions.png   # 작업영역 분석 자료
-│   └── zero_pose.png              # 영점 포즈 캡처
-├── model/
-│   ├── indy7.urdf                 # 공식 Indy7 URDF 모델
-│   └── Indy7_v1_Layout.pdf        # 공식 제품 도면
-├── src/
-│   ├── Indy7_2D3DOF.py            # 2D 3자유도 평면 역동역학 및 선형 회귀행렬
-│   ├── 2D_trajectory.py           # 5차 푸리에 급수 여기 궤적 생성 및 최적화
-│   ├── identify_payload.py        # 2단계 OLS 페이로드 식별 모듈
-│   ├── preprocess_sensor_log.py   # 영위상 버터워스 필터 및 Savitzky-Golay 미분
-│   ├── run_experiment.py          # 전체 파이프라인 통합 실행 및 결과 시각화
-│   ├── collision_detector.py      # 센서리스 모멘텀 관측기 기반 충돌 감지기
-│   ├── online_rls_estimator.py    # 급변 하중 실시간 추종 재귀 최소자승법 (RLS)
-│   ├── adaptive_controller.py     # 계산 토크 제어 (CTC) 페이로드 피드포워드 보상기
-│   ├── safety_supervisor.py       # ISO/TS 15066 실시간 안전 감시자
-│   ├── ekf_payload_estimator.py   # 가속도 미분 없는 10차원 EKF 상태-파라미터 추정기
-│   ├── manipulability_analysis.py # 요시카와 가조작도 및 특이점 마진 검증기
-│   ├── frequency_response_analysis.py # FFT/PSD 스펙트럼 및 공진 대역 회피 검증기
-│   ├── spatial_6dof_payload_identifier.py # 3D 공간 6자유도 확장 회귀 모듈
-│   ├── symbolic_dynamics.py       # SymPy 기반 기호 역동역학 폐형식 유도기
-│   ├── statistical_validation.py  # 95% 신뢰구간, 표준오차, t-통계량 분석 모듈
-│   ├── hand_guiding_controller.py # 무중력 다이렉트 티칭 어드미턴스 핸드가이딩 제어기
-│   ├── slosh_free_shaper.py       # ZVD 입력 성형 액체 출렁임 억제기
-│   └── dob_robust_controller.py   # 외란 관측기(DOB) 2차 Q-필터 2자유도 강인 제어기
-├── tests/
-│   └── test_pipeline.py           # 8대 핵심 기능 단위 테스트 (100% 통과)
-├── web/
-│   ├── index.html                 # Three.js 3D 기구학 뷰어 UI
-│   └── viewer.js                  # Three.js 렌더링 파이프라인
-└── requirements.txt               # 프로젝트 의존성 목록
+config/indy7_dimensions.py   링크 치수, 질량, 관성, 관절 한계 (URDF 기반)
+model/                       indy7.urdf, 메쉬, 제품 도면
+src/
+├── Indy7_FK.py              순기구학
+├── Indy7_Jacobian.py        TCP·링크 무게중심 자코비안
+├── indy7_dynamics.py        6자유도 동역학
+├── Indy7_2D3DOF.py          2D 3자유도 토크 모델, 회귀행렬
+├── 2D_trajectory.py         푸리에 궤적, 조건 수 목적함수, 제약조건, SLSQP
+├── identify_payload.py      페이로드 식별 (미구현)
+└── viewer_3d.py             3D 뷰어 서버 (web/ 사용, 최적화 궤적 .npz 재생)
+web/                         Three.js 뷰어
+tests/test_pipeline.py       구버전 테스트, 현재 코드와 맞지 않음
 ```
 
----
+## 궤적 최적화 방식
 
-## 실행 가이드
+- 관절당 5개 고조파의 유한 푸리에 급수, 주기 10 s.
+- 시작 시 속도·가속도 경계조건을 해석적으로 만족시켜 변수를 30개에서 21개로 축소.
+- 목적함수: 회귀행렬을 쌓은 행렬의 조건 수.
+- 제약조건: 관절 위치·속도·토크가 한계치의 80% 이내(안전율 1.25).
 
-### 1. 가상환경 활성화 및 의존성 설치
+## 실행
+
 ```powershell
-cd "d:\01_Academic\yonsei univ\2026-2\학부연구\Indy7_kinematics_sihyun"
-.\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
+cd src
+python Indy7_2D3DOF.py     # 선형화 정합성 확인
+python 2D_trajectory.py    # 궤적 최적화, 결과를 optimized_trajectory.npz/.txt 로 저장
+cd ..
+python src/viewer_3d.py    # 3D 뷰어
 ```
-
-### 2. 단위 테스트 실행 (8대 핵심 파이프라인 검증)
-```powershell
-python -m unittest tests/test_pipeline.py -v
-```
-출력 결과:
-```text
-test_01_forward_kinematics ... ok
-test_02_regressor_linearity ... ok
-test_03_trajectory_boundary_conditions ... ok
-test_04_ols_identification ... ok
-test_05_safety_supervisor ... ok
-test_06_momentum_observer ... ok
-test_07_frequency_separation ... ok
-test_08_spatial_6dof_regressor ... ok
-----------------------------------------------------------------------
-Ran 8 tests in 0.816s - OK
-```
-
-### 3. 전체 식별 실험 파이프라인 및 그래프 생성
-```powershell
-python src/run_experiment.py
-```
-- 결과 산출물: `docs/identification_results.png` 생성 확인.
