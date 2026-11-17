@@ -105,8 +105,17 @@ def evaluate_constraints(
     for i in range(N):
         torque_all[i,:] = compute_torque(q[i], qdot[i], qddot[i])
     margin_torque  = ((torque_max - np.abs(torque_all)) / torque_max).flatten()
+
+    #절대좌표 마진
+    z_min  = 0.1
+    margin_z = []
+    for i in range(N):
+        p1, p2, p3 = fk_2D(q[i])
+        margin_z.extend([p1[1], p2[1], p3[1]])
+    margin_z = (np.array(margin_z) - z_min)
+
         
-    return np.concatenate([margin_q_upper, margin_q_lower, margin_qdot, margin_torque])
+    return np.concatenate([margin_q_upper, margin_q_lower, margin_qdot, margin_torque, margin_z ])
 
 # SLSQP솔버 조립
 def slsqp(
@@ -150,8 +159,9 @@ def save(optimized_coeffs):
     np.save("optimized_coeffs.npy", optimized_coeffs)
     np.savetxt("optimized_coeffs.txt", optimized_coeffs, fmt="%.8f")
     print("최적화 계수가 'optimized_coeffs.npy' 및 'optimized_coeffs.txt'에 저장되었습니다.")
-    Time_vec, q, qdot, qddot  = trajectory_evaluator(optimized_coeffs)
+    Time_vec, q, qdot, qddot  = trajectory_evaluator(optimized_coeffs, time_step=0.00025)
     N = len(q)
+    
     torque =   np.zeros((N, 3))
     for i in range(N):
         torque[i,:] = compute_torque(q[i], qdot[i], qddot[i])
@@ -166,6 +176,9 @@ def save(optimized_coeffs):
     print(f"q_max        : {np.max(q, axis=0)}")
     print(f"|qdot|_max   : {np.max(np.abs(qdot), axis=0)}")
     print(f"|torque|_max : {np.max(np.abs(torque), axis=0)}")
+
+    z = np.array([[p[1] for p in fk_2D(q_t)] for q_t in q])
+    print(f"높이 최소(p1,p2,p3) : {np.min(z, axis=0)}")
 
 if __name__ == "__main__":
     print(f"--------test--------")
@@ -187,7 +200,7 @@ if __name__ == "__main__":
 
     # 제약조건 벡터 검증
     c_vals_test = evaluate_constraints(coeffs_test)
-    print(f"제약조건 벡터 형태: {c_vals_test.shape}") # (2400,)
+    print(f"제약조건 벡터 형태: {c_vals_test.shape}") # (2700,)
     print(f"최소 마진(음수면 위반): {np.min(c_vals_test):.4f}")
 
     print(f"--------실행--------")
