@@ -83,7 +83,7 @@ def compute_condition_number(
     cond_Y_all = sigmas[-1] / sigmas[0]
     return float(cond_Y_all)
 
-# 제약조건, 다운샘플링 후 12*200=2400 벡터  출력
+# 제약조건, 다운샘플링 후 12*100=1200 벡터  출력
 def evaluate_constraints(
     fourier_coeffs_21: np.ndarray,
     time_step: float = 0.1,
@@ -183,9 +183,9 @@ def save(optimized_coeffs):
 if __name__ == "__main__":
     print(f"--------test--------")
     coeffs_test = np.array([
-        0.042, -0.038,  0.025, -0.012,  0.035, -0.028,  0.018,
-        0.035,  0.045, -0.022,  0.015, -0.028,  0.032, -0.014,
-       -0.028,  0.032,  0.038, -0.016,  0.022, -0.025,  0.012
+        0.001,  0.045, -0.036,  0.045, -0.019, -0.008,  0.033,
+        -0.009,  0.005, -0.047,  0.025,  0.004, -0.017,  0.029,
+        -0.020, -0.005, -0.037, -0.010, -0.030, -0.024,  0.025,
     ])
     t_test, q_test, qdot_test, qddot_test = trajectory_evaluator(coeffs_test)
     
@@ -200,7 +200,7 @@ if __name__ == "__main__":
 
     # 제약조건 벡터 검증
     c_vals_test = evaluate_constraints(coeffs_test)
-    print(f"제약조건 벡터 형태: {c_vals_test.shape}") # (2700,)
+    print(f"제약조건 벡터 형태: {c_vals_test.shape}") # (1500,)
     print(f"최소 마진(음수면 위반): {np.min(c_vals_test):.4f}")
 
     print(f"--------실행--------")

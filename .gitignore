@@ -13,3 +13,5 @@ optimized_coeffs.npy
 optimized_coeffs.txt
 optimized_trajectory.npz
 optimized_trajectory.txt
+data/trajectories/*.npz
+data/trajectories/*.txt
