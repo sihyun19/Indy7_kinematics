@@ -1,3 +1,3 @@
-id,cond,dt,n_samples,period,max_abs_qdot1,max_abs_qdot2,max_abs_qdot3,max_abs_torque1,max_abs_torque2,max_abs_torque3,min_height_p3,min_height_all,created,seed,note
-001,1.8459,0.00025,40000,10,2.0926,1.8661,2.5244,86.8382,46.6221,18.0715,0.3093,0.0969,2026-11-17 13:07,,
-002,1.9494,0.00025,40000,10,0.7110,2.0928,2.5250,93.7361,54.6167,18.0344,0.7122,0.7122,2026-11-17 14:46,,
+id,cond,dt,period,max_abs_qdot1,max_abs_qdot2,max_abs_qdot3,max_abs_torque1,max_abs_torque2,max_abs_torque3,min_height_p3,min_height_all,note
+001,1.8459,0.00025,10,2.0926,1.8661,2.5244,86.8382,46.6221,18.0715,0.3093,0.0969,
+002,1.9494,0.00025,10,0.711,2.0928,2.525,93.7361,54.6167,18.0344,0.7122,0.7122,

@@ -5,6 +5,8 @@ import os
 import numpy as np
 from Indy7_2D3DOF import INDY7_2D_JOINTS, fk_2D, compute_torque, compute_regressor
 from scipy.optimize import minimize
+import csv, re, datetime
+from pathlib import Path
 
 # 푸리에 계수에 따른 q, qdot, qddot 행렬 생성
 def trajectory_evaluator(
@@ -155,21 +157,41 @@ def slsqp(
     )
     return result
 
-def save(optimized_coeffs):
-    np.save("optimized_coeffs.npy", optimized_coeffs)
-    np.savetxt("optimized_coeffs.txt", optimized_coeffs, fmt="%.8f")
-    print("최적화 계수가 'optimized_coeffs.npy' 및 'optimized_coeffs.txt'에 저장되었습니다.")
+
+TRAJ_DIR = Path(__file__).resolve().parent.parent / "data" / "trajectories"
+
+def next_id(out_dir):
+    ids = [int(m.group(1)) for f in Path(out_dir).glob("optimized_coeffs_*.npy")
+           if (m := re.search(r"_(\d+)\.npy$", f.name))]
+    return max(ids, default=0) + 1
+
+def run_random(scale=0.1, maxiter=100, max_try=100):
+    TRAJ_DIR.mkdir(parents=True, exist_ok=True)
+    for _ in range(max_try):
+        coeffs = np.random.uniform(-scale, scale, 21)
+        if np.min(evaluate_constraints(coeffs)) >= 0:
+            break
+    else:
+        raise RuntimeError(f"만족하는 seed를 찾지 못했습니다.")
+    print(f"coeffs={coeffs}")
+    return coeffs
+
+def save(optimized_coeffs, out_dir: str | Path  =".", tag =""):
+    out_dir = Path(out_dir)
+    np.save(out_dir / f"optimized_coeffs{tag}.npy", optimized_coeffs)
+    np.savetxt(out_dir / f"optimized_coeffs{tag}.txt", optimized_coeffs, fmt="%.8f")
+    print(f"최적화 계수가 'optimized_coeffs{tag}.npy' 및 '.txt'에 저장되었습니다.")
     Time_vec, q, qdot, qddot  = trajectory_evaluator(optimized_coeffs, time_step=0.00025)
     N = len(q)
     
     torque =   np.zeros((N, 3))
     for i in range(N):
         torque[i,:] = compute_torque(q[i], qdot[i], qddot[i])
-    np.savez("optimized_trajectory.npz", time=Time_vec, q =q, qdot=qdot, qddot=qddot, torque=torque)
+    np.savez(out_dir / f"optimized_trajectory{tag}.npz", time=Time_vec, q=q, qdot=qdot, qddot=qddot, torque=torque)
     trajectory_data = np.column_stack([Time_vec[:, None], q, qdot, qddot,torque])
     header_str = "time, q1, q2, q3, qdot1, qdot2, qdot3, qddot1, qddot2, qddot3, torque1, torque2, torque3"
-    np.savetxt("optimized_trajectory.txt", trajectory_data, fmt="%.8f",delimiter=", ",header=header_str)
-    print("최적화 경로가 'optimized_trajectory.npz' 및 'optimized_trajectory.txt'에 저장되었습니다.")
+    np.savetxt(out_dir / f"optimized_trajectory{tag}.txt", trajectory_data, fmt="%.8f", delimiter=", ", header=header_str)
+    print(f"최적화 경로가 'optimized_trajectory{tag}.npz' 및 '.txt'에 저장되었습니다.")
     is_valid = np.all(evaluate_constraints(optimized_coeffs, 0.01) >= -1e-3)
     print(f"제약조건 만족 여부(여유 20%): {is_valid}")
     print(f"q_min        : {np.min(q, axis=0)}")
@@ -182,11 +204,15 @@ def save(optimized_coeffs):
 
 if __name__ == "__main__":
     print(f"--------test--------")
-    coeffs_test = np.array([
-        0.001,  0.045, -0.036,  0.045, -0.019, -0.008,  0.033,
-        -0.009,  0.005, -0.047,  0.025,  0.004, -0.017,  0.029,
-        -0.020, -0.005, -0.037, -0.010, -0.030, -0.024,  0.025,
-    ])
+    ##
+    # coeffs_test = np.array([
+    #    -0.022, -0.001,  0.048,  0.046,  0.022,  0.004, -0.022,
+    #    -0.034,  0.047,  0.002, -0.038,  0.012,  0.028,  0.011,
+    #    0.042, -0.046,  0.003, -0.004, -0.044,  0.014,  0.035,
+    #])
+    ##
+
+    coeffs_test = run_random()
     t_test, q_test, qdot_test, qddot_test = trajectory_evaluator(coeffs_test)
     
     
@@ -206,7 +232,8 @@ if __name__ == "__main__":
     print(f"--------실행--------")
     res= slsqp(coeffs_test)
     if res.success:
-        save(res.x)
+        TRAJ_DIR.mkdir(parents=True, exist_ok=True)
+        save(res.x, TRAJ_DIR, f"_{next_id(TRAJ_DIR):03d}")
         
     else:
         print(f"최적화 실패: {res.message}")
