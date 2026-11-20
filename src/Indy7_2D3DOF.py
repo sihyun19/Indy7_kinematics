@@ -78,7 +78,7 @@ def compute_torque(
     friction_params: np.ndarray | None = None
 ) -> np.ndarray:
     """
-    2D 3자유도 평면 로봇 + 페이로드 + 마찰의 전체 역동역학 토크 계산
+    2D 3자유도 평면 로봇 + 페이로드 + 마찰의 전체 동역학 토크 계산
     
     입력:
       q, qdot, qddot     : (3,) 각도, 각속도, 각가속도 [rad, rad/s, rad/s^2]
