@@ -26,7 +26,7 @@ def inverse_regressor(
 ):
     loaded_time, loaded_q, loaded_qdot, loaded_qddot, loaded_torque = get_loaded_data()
     unloaded_time, unloaded_q, unloaded_qdot, unloaded_qddot, unloaded_torque = get_unloaded_data()
-    if not len(loaded_q) == len(unloaded_q) and not np.allclose(loaded_time, unloaded_time) :
+    if not len(loaded_q) == len(unloaded_q) or not np.allclose(loaded_time, unloaded_time) :
         raise ValueError
     N= len(loaded_q)
     Y_all = np.zeros((3 * N, 4))
