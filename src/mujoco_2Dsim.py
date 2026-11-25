@@ -42,13 +42,22 @@ def simulate_dynamics(
         data.qvel[idx] = qdot[i]
         data.qacc[idx] = qddot[i]
         mujoco.mj_inverse(model, data)
+        if data.ncon > 0:
+            contact_idx.append(i)
         torque[i] = data.qfrc_inverse[idx]
+    if contact_idx:
+        raise RuntimeError(f"접촉 발생: {len(contact_idx)}/{N} 샘플")
     return torque
 
 def comvert_form(pos, mass, ipos, inertia):
     offset = pos + ipos
-    cx= 
+    cx = offset[2]
+    cy = -offset[0]
+    Io = inertia[1] + mass*( cx**2 + cy**2 )
+    return mass, cx, cy, Io
 
+    
+    
 if __name__ == "__main__":
     m_loaded = build_model(mass=2.5)
     m_free = build_model()
