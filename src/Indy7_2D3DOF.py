@@ -98,8 +98,8 @@ def compute_torque(
 
     T = np.column_stack([-np.sin(phi), np.cos(phi)]) 
     N = np.column_stack([-np.cos(phi), -np.sin(phi)])
-    u, uc = L[:, None] * T, Lc[:, None] * T
-    u_dot, uc_dot = (phi_dot * L)[:, None] * N, (phi_dot * Lc)[:, None] * N
+    u, uc = L[:, None] * N, Lc[:, None] * N
+    u_dot, uc_dot = -(phi_dot * L)[:, None] * T, -(phi_dot * Lc)[:, None] * T
 
     Jv_list = []
     Jv_dot_list = []
@@ -129,8 +129,8 @@ def compute_torque(
     C_payload = np.zeros((3, 3))
     g_payload = np.zeros(3)
     if payload_params is not None:
-        u_payload = payload_params[1] * T[2] +  payload_params[2] * N[2]
-        u_dot_payload = phi_dot[-1] * ( payload_params[1] * N[2] - payload_params[2] * T[2] )
+        u_payload = payload_params[1] * N[2] -  payload_params[2] * T[2]
+        u_dot_payload = phi_dot[-1] * ( - payload_params[1] * T[2] - payload_params[2] * N[2] )
         Jv_payload = Jv_list[2] + np.column_stack([-uc[2]+u[2]+u_payload, -uc[2]+u[2]+u_payload, -uc[2]+u[2]+u_payload])
         Jv_dot_payload = Jv_dot_list[2] + np.column_stack([-uc_dot[2]+u_dot[2]+u_dot_payload, -uc_dot[2]+u_dot[2]+u_dot_payload, -uc_dot[2]+u_dot[2]+u_dot_payload])
         m_payload = payload_params[0]
