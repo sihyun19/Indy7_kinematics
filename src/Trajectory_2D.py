@@ -208,6 +208,7 @@ def slsqp(
         method = 'SLSQP',
         constraints = { 'type' : 'ineq', 'fun' : evaluate_constraints },
         callback = print_count,
+        bounds = [(-2.0, 2.0)] * 21,
         options= {
             'maxiter': maxiter,
             'disp': True,
