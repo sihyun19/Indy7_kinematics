@@ -5,8 +5,10 @@ import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 from config.indy7_dimensions import Joint, INDY7_JOINTS, TCP_OFFSET, TCP_DIR
-from Indy7_FK import fk
+from src.Indy7_FK import fk
 T_tcp, p_joints, z_axes, p_com, T_links = fk(np.zeros(6))
+R_k = [T[:3, :3] for T in T_links[1:]]
+I_world = [R @ j.inertia @ R.T for R, j in zip(R_k, INDY7_JOINTS)]
 
 #파라미터 정리
 @dataclass
@@ -38,7 +40,11 @@ INDY7_2D_JOINTS = [
     Joint2D(
         name = "joint3",
         len_val =  INDY7_JOINTS[2].len_val,
+        l_com = (INDY7_JOINTS[2].mass * p_com[2,2] + INDY7_JOINTS[3].mass * p_com[2,3]) / (INDY7_JOINTS[2].mass + INDY7_JOINTS[3].mass) - p_joints[2,2],
         mass = INDY7_JOINTS[2].mass + INDY7_JOINTS[3].mass,
+        inertia_zz = I_world[2][1,1] + I_world[3][1,1] 
+                    + INDY7_JOINTS[2].mass  * ((p_com[0,2] - (INDY7_JOINTS[2].mass * p_com[0,2] + INDY7_JOINTS[3].mass * p_com[0,3]) / (INDY7_JOINTS[2].mass + INDY7_JOINTS[3].mass))**2 + (p_com[2,2] - (INDY7_JOINTS[2].mass * p_com[2,2] + INDY7_JOINTS[3].mass * p_com[2,3]) / (INDY7_JOINTS[2].mass + INDY7_JOINTS[3].mass))**2 )
+                    + INDY7_JOINTS[3].mass  * ((p_com[0,3] - (INDY7_JOINTS[2].mass * p_com[0,2] + INDY7_JOINTS[3].mass * p_com[0,3]) / (INDY7_JOINTS[2].mass + INDY7_JOINTS[3].mass))**2 + (p_com[2,3] - (INDY7_JOINTS[2].mass * p_com[2,2] + INDY7_JOINTS[3].mass * p_com[2,3]) / (INDY7_JOINTS[2].mass + INDY7_JOINTS[3].mass))**2 ),
         q_max = 3.0543261909900767,
         q_min = -3.0543261909900767,
         qdot_max = 2.6179938779914944,
@@ -48,7 +54,11 @@ INDY7_2D_JOINTS = [
     Joint2D(
         name = "joint5",
         len_val = INDY7_JOINTS[3].len_val + INDY7_JOINTS[4].len_val,
+        l_com = (INDY7_JOINTS[4].mass * p_com[2,4] + INDY7_JOINTS[5].mass * p_com[2,5]) / (INDY7_JOINTS[4].mass + INDY7_JOINTS[5].mass) - p_joints[2,4],
         mass = INDY7_JOINTS[4].mass + INDY7_JOINTS[5].mass,
+        inertia_zz = I_world[4][1,1] + I_world[5][1,1] 
+                    + INDY7_JOINTS[4].mass  * ((p_com[0,4] - (INDY7_JOINTS[4].mass * p_com[0,4] + INDY7_JOINTS[5].mass * p_com[0,5]) / (INDY7_JOINTS[4].mass + INDY7_JOINTS[5].mass))**2 + (p_com[2,4] - (INDY7_JOINTS[4].mass * p_com[2,4] + INDY7_JOINTS[5].mass * p_com[2,5]) / (INDY7_JOINTS[4].mass + INDY7_JOINTS[5].mass))**2 )
+                    + INDY7_JOINTS[5].mass  * ((p_com[0,5] - (INDY7_JOINTS[4].mass * p_com[0,4] + INDY7_JOINTS[5].mass * p_com[0,5]) / (INDY7_JOINTS[4].mass + INDY7_JOINTS[5].mass))**2 + (p_com[2,5] - (INDY7_JOINTS[4].mass * p_com[2,4] + INDY7_JOINTS[5].mass * p_com[2,5]) / (INDY7_JOINTS[4].mass + INDY7_JOINTS[5].mass))**2 ),
         q_max = 3.0543261909900767,
         q_min = -3.0543261909900767,
         qdot_max = 3.141592653589793,
