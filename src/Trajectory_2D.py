@@ -8,6 +8,11 @@ from scipy.optimize import minimize
 import csv, re, datetime
 from pathlib import Path
 
+L_PAYLOAD = 0.20  
+W_PAYLOAD = 0.20
+R_PAYLOAD = float(np.hypot(L_PAYLOAD / 2, W_PAYLOAD / 2))
+MAX_PAYLOAD = np.array([5.0, 0.10, 0.0, 0.085])
+
 # 푸리에 계수에 따른 q, qdot, qddot 행렬 생성
 def trajectory_evaluator(
     fourier_coeffs_21 : np.ndarray,
@@ -105,7 +110,9 @@ def evaluate_constraints(
     margin_qdot    = ((qdot_max - np.abs(qdot)) / qdot_max).flatten()
     torque_all =   np.zeros((N, 3))
     for i in range(N):
-        torque_all[i,:] = compute_torque(q[i], qdot[i], qddot[i])
+        tau_free = compute_torque(q[i], qdot[i], qddot[i])
+        tau_max  = compute_torque(q[i], qdot[i], qddot[i], MAX_PAYLOAD)
+        torque_all[i, :] = np.maximum(np.abs(tau_free), np.abs(tau_max))
     margin_torque  = ((torque_max - np.abs(torque_all)) / torque_max).flatten()
 
     #절대좌표 마진
@@ -113,7 +120,7 @@ def evaluate_constraints(
     margin_z = []
     for i in range(N):
         p1, p2, p3 = fk_2D(q[i])
-        margin_z.extend([p1[1], p2[1], p3[1]])
+        margin_z.extend([p1[1], p2[1], p3[1], p3[1] + (L_PAYLOAD / 2) * np.cos(np.sum(q[i]))- R_PAYLOAD])
     margin_z = (np.array(margin_z) - z_min)
 
     #충돌 마진
@@ -129,18 +136,27 @@ def collision(
     q : np.ndarray
 ) -> np.ndarray :
     base = np.array([0.0, 0.0])
-    p1, p2, p3 = fk_2D(q)
     p0= np.array([0.0, INDY7_2D_JOINTS[0].len_val])
+    p1, p2, p3 = fk_2D(q)
+    T = np.array([-np.sin(np.sum(q)), np.cos(np.sum(q))])
+    p_pay = p3 + (L_PAYLOAD / 2) * T
     d0 = link_link_distance(base, p0, p1, p2)
     d1 = link_link_distance(base, p0, p2, p3)
     d2 = link_link_distance(p0, p1, p2, p3)
+    d3 = point_link_distance(p_pay, base, p0)
+    d4 = point_link_distance(p_pay, p0, p1)
+    d5 = point_link_distance(p_pay, p1, p2)
+
     
     CLEARANCE = 0.02
     R1, R2, R3 = (j.R for j in INDY7_2D_JOINTS)
     return np.array([d0 - (R_BASE_2D + R2 + CLEARANCE),
                      d1 - (R_BASE_2D + R3 + CLEARANCE),
-                     d2 - (R1 + R3 + CLEARANCE)])
-    
+                     d2 - (R1 + R3 + CLEARANCE),
+                     d3 - (R_PAYLOAD + R_BASE_2D + CLEARANCE),
+                     d4 - (R_PAYLOAD + R1 + CLEARANCE),
+                     d5 - (R_PAYLOAD + R2 + CLEARANCE)])
+
 def point_link_distance(p, link_start, link_end):
     link = link_end - link_start
     t = np.clip(np.dot(p - link_start, link) / np.dot(link, link), 0.0, 1.0)
@@ -251,24 +267,35 @@ def save(optimized_coeffs, out_dir: str | Path  =".", tag =""):
 def report_violations(coeffs, time_step=0.01, period=10.0):
     c = evaluate_constraints(coeffs, time_step, period)
     N = int(period / time_step)
-    blocks = c.reshape(6, N, 3)
+    specs = [
+        ("q_upper", ["joint2", "joint3", "joint5"], "(비율)"),
+        ("q_lower", ["joint2", "joint3", "joint5"], "(비율)"),
+        ("qdot",    ["joint2", "joint3", "joint5"], "(비율)"),
+        ("torque",  ["joint2", "joint3", "joint5"], "(비율)"),
+        ("z",       ["p1", "p2", "p3", "pay"],      "m"),
+        ("col",     ["base-L2", "base-L3", "L1-L3", "pay-base", "pay-L1", "pay-L2"], "m"),
+    ]
+    offset = 0
+    for name, labels, unit in specs:
+        k = len(labels)
+        block = c[offset : offset + N * k].reshape(N, k)
+        offset += N * k
+        for j, label in enumerate(labels):
+            m = block[:, j]
 
-    names = ["q_upper", "q_lower", "qdot", "torque", "z", "col"]
-    cols  = {"z":   ["p1", "p2", "p3"],
-             "col": ["base-L2", "base-L3", "L1-L3"]}
-    units = {"z": "m", "col": "m"}
-
-    print("---- 제약 위반 리포트 ----")
+        print("---- 제약 위반 리포트 ----")
     any_violation = False
-    for k, name in enumerate(names):
-        for j in range(3):
-            m = blocks[k, :, j]
+    offset = 0
+    for name, labels, unit in specs:
+        k = len(labels)
+        block = c[offset : offset + N * k].reshape(N, k)
+        offset += N * k
+        for j, label in enumerate(labels):
+            m = block[:, j]
             if m.min() >= 0:
                 continue
             any_violation = True
             i = m.argmin()
-            label = cols.get(name, ["joint1", "joint2", "joint3"])[j]
-            unit = units.get(name, "(비율)")
             print(f"{name:8s} {label:8s}: 최대 위반 {m.min():+.4f} {unit}, " f"t = {i * time_step:.2f} s, 위반 샘플 {np.sum(m < 0)}/{N}")
     if not any_violation:
         print("위반 없음")
