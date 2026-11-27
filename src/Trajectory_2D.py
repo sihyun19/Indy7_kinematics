@@ -184,7 +184,7 @@ def slsqp(
     coeffs_21: np.ndarray | None = None,
     maxiter: int = 100,
     eps: float = 1e-4,
-    ftol: float = 1e-4
+    ftol: float = 1e-3
 ):
     if coeffs_21 is None:
         coeffs_21 = np.array([
@@ -276,7 +276,7 @@ def report_violations(coeffs, time_step=0.01, period=10.0):
         ("z",       ["p1", "p2", "p3", "pay"],      "m"),
         ("col",     ["base-L2", "base-L3", "L1-L3", "pay-base", "pay-L1", "pay-L2"], "비율"),
     ]
-        print("---- 제약 위반 리포트 ----")
+    print("---- 제약 위반 리포트 ----")
     any_violation = False
     offset = 0
     for name, labels, unit in specs:

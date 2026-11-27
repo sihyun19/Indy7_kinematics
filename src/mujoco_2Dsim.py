@@ -59,8 +59,6 @@ def run_sim(traj_id: int, payload: dict | None = None):
     tag = "unloaded" if payload is None else "loaded"
     out = out_dir / f"sim_{tag}.npz"
     sim_data = dict(time=traj["time"], q=traj["q"], qdot=traj["qdot"], qddot=traj["qddot"], torque=torque)
-    if payload is not None:
-        sim_data["true_params"] = np.array(comvert_form(**payload))
     np.savez(out, **sim_data)
     print(f"저장: {out}  |torque|_max: {np.abs(torque).max(axis=0)}")
     return torque
