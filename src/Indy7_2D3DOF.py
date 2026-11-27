@@ -5,13 +5,14 @@ import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 from config.indy7_dimensions import Joint, INDY7_JOINTS, TCP_OFFSET, TCP_DIR
+from Indy7_FK import fk
+T_tcp, p_joints, z_axes, p_com, T_links = fk(np.zeros(6))
 
 #파라미터 정리
 @dataclass
 class Joint2D:
     name: str
-    lenth: float
-    lenth_dir: np.ndarray | None = None
+    len_val: float
     l_com: float=0.5
     mass: float = 0.0
     inertia_zz : float = 2.0
@@ -19,55 +20,56 @@ class Joint2D:
     q_min : float = 0.0 
     qdot_max : float = 0.0 
     effort : float = 0.0
+    R : float = 0.1
 
 INDY7_2D_JOINTS = [
     Joint2D(
-        name = "joint0",#base
-        lenth = INDY7_JOINTS[0].len_val + INDY7_JOINTS[1].len_val
-    ),
-    Joint2D(
-        name = "joint1",
-        lenth = INDY7_JOINTS[2].len_val,
-        mass = INDY7_JOINTS[2].mass,
-        q_max = 3.0543261909900767,
-        q_min = -3.0543261909900767,
-        qdot_max = 2.6179938779914944,
-        effort = 431.97
-    ),
-    Joint2D(
         name = "joint2",
-        lenth =  INDY7_JOINTS[3].len_val + INDY7_JOINTS[4].len_val,
-        mass = INDY7_JOINTS[3].mass + INDY7_JOINTS[4].mass,
+        len_val = INDY7_JOINTS[0].len_val + INDY7_JOINTS[1].len_val,
+        l_com = p_com[2,1]-p_joints[2,1],
+        mass = INDY7_JOINTS[1].mass,
+        inertia_zz = INDY7_JOINTS[1].inertia[2,2],
         q_max = 3.0543261909900767,
         q_min = -3.0543261909900767,
         qdot_max = 2.6179938779914944,
-        effort = 197.23
+        effort = 431.97,
+        R = 0.075
     ),
     Joint2D(
         name = "joint3",
-        lenth = INDY7_JOINTS[5].len_val + TCP_OFFSET,
-        mass = INDY7_JOINTS[5].mass,
+        len_val =  INDY7_JOINTS[2].len_val,
+        mass = INDY7_JOINTS[2].mass + INDY7_JOINTS[3].mass,
+        q_max = 3.0543261909900767,
+        q_min = -3.0543261909900767,
+        qdot_max = 2.6179938779914944,
+        effort = 197.23,
+        R = 0.050
+    ),
+    Joint2D(
+        name = "joint5",
+        len_val = INDY7_JOINTS[3].len_val + INDY7_JOINTS[4].len_val,
+        mass = INDY7_JOINTS[4].mass + INDY7_JOINTS[5].mass,
         q_max = 3.0543261909900767,
         q_min = -3.0543261909900767,
         qdot_max = 3.141592653589793,
-        effort = 79.79
+        effort = 79.79,
+        R = 0.045
     )
 ]
+R_BASE_2D = 0.075
+TCP_OFFSET_2D =  INDY7_JOINTS[5].len_val + TCP_OFFSET
 
 def fk_2D(q: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     2D 3자유도 순기구학 (각 관절 2D 좌표 반환)
     기준 좌표계: Base 관절 위치 (0, L0)
     """
-    L0 = INDY7_2D_JOINTS[0].lenth
-    L = np.array([j.lenth for j in INDY7_2D_JOINTS[1:]])
     phi = np.cumsum(q)
     T = np.column_stack([-np.sin(phi), np.cos(phi)])
-
-    p0 = np.array([0.0, L0])
-    p1 = p0 + L[0] * T[0]
-    p2 = p1 + L[1] * T[1]
-    p3 = p2 + L[2] * T[2]
+    p0 = np.array([0.0, INDY7_2D_JOINTS[0].len_val])      # J2 위치
+    p1 = p0 + INDY7_2D_JOINTS[1].len_val * T[0]           # J3 위치
+    p2 = p1 + INDY7_2D_JOINTS[2].len_val * T[1]           # J5 위치
+    p3 = p2 + TCP_OFFSET_2D * T[2]                        # TCP 위치
     return p1, p2, p3
 
 def compute_torque(
@@ -91,10 +93,10 @@ def compute_torque(
     phi = np.cumsum(q) 
     phi_dot = np.cumsum(qdot) 
 
-    L  = np.array([j.lenth for j in INDY7_2D_JOINTS[1:]])
-    Lc = np.array([j.l_com for j in INDY7_2D_JOINTS[1:]])
-    m  = np.array([j.mass for j in INDY7_2D_JOINTS[1:]])
-    I  = np.array([j.inertia_zz for j in INDY7_2D_JOINTS[1:]])
+    L  = np.array([INDY7_2D_JOINTS[1].len_val, INDY7_2D_JOINTS[2].len_val, TCP_OFFSET_2D])
+    Lc = np.array([j.l_com for j in INDY7_2D_JOINTS])
+    m  = np.array([j.mass for j in INDY7_2D_JOINTS])
+    I  = np.array([j.inertia_zz for j in INDY7_2D_JOINTS])
 
     T = np.column_stack([-np.sin(phi), np.cos(phi)]) 
     N = np.column_stack([-np.cos(phi), -np.sin(phi)])

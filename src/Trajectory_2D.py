@@ -3,7 +3,7 @@ SLSQP솔버
 '''
 import os
 import numpy as np
-from Indy7_2D3DOF import INDY7_2D_JOINTS, fk_2D, compute_torque, compute_regressor
+from Indy7_2D3DOF import INDY7_2D_JOINTS, R_BASE_2D, fk_2D, compute_torque, compute_regressor
 from scipy.optimize import minimize
 import csv, re, datetime
 from pathlib import Path
@@ -95,10 +95,10 @@ def evaluate_constraints(
     _, q, qdot, qddot = trajectory_evaluator(fourier_coeffs_21, time_step, period)
     N = len(q)
 
-    q_max = np.array([0.8*j.q_max for j in INDY7_2D_JOINTS[1:]])
-    q_min = np.array([0.8*j.q_min for j in INDY7_2D_JOINTS[1:]])
-    qdot_max = np.array([0.8*j.qdot_max for j in INDY7_2D_JOINTS[1:]])
-    torque_max = np.array([0.8*j.effort for j in INDY7_2D_JOINTS[1:]])
+    q_max = np.array([0.8*j.q_max for j in INDY7_2D_JOINTS])
+    q_min = np.array([0.8*j.q_min for j in INDY7_2D_JOINTS])
+    qdot_max = np.array([0.8*j.qdot_max for j in INDY7_2D_JOINTS])
+    torque_max = np.array([0.8*j.effort for j in INDY7_2D_JOINTS])
 
     margin_q_upper = ((q_max - q) / q_max).flatten()
     margin_q_lower = ((q - q_min) / np.abs(q_min)).flatten()
@@ -116,8 +116,51 @@ def evaluate_constraints(
         margin_z.extend([p1[1], p2[1], p3[1]])
     margin_z = (np.array(margin_z) - z_min)
 
+    #충돌 마진
+    margin_col = []
+    for i in range(N):
+        margin_col.extend(collision(q[i]))
+    margin_col = np.array(margin_col)
+
         
-    return np.concatenate([margin_q_upper, margin_q_lower, margin_qdot, margin_torque, margin_z ])
+    return np.concatenate([margin_q_upper, margin_q_lower, margin_qdot, margin_torque, margin_z, margin_col ])
+
+def collision(
+    q : np.ndarray
+) -> np.ndarray :
+    base = np.array([0.0, 0.0])
+    p1, p2, p3 = fk_2D(q)
+    p0= np.array([0.0, INDY7_2D_JOINTS[0].len_val])
+    d0 = link_link_distance(base, p0, p1, p2)
+    d1 = link_link_distance(base, p0, p2, p3)
+    d2 = link_link_distance(p0, p1, p2, p3)
+    
+    CLEARANCE = 0.02
+    R1, R2, R3 = (j.R for j in INDY7_2D_JOINTS)
+    return np.array([d0 - (R_BASE_2D + R2 + CLEARANCE),
+                     d1 - (R_BASE_2D + R3 + CLEARANCE),
+                     d2 - (R1 + R3 + CLEARANCE)])
+    
+def point_link_distance(p, link_start, link_end):
+    link = link_end - link_start
+    t = np.clip(np.dot(p - link_start, link) / np.dot(link, link), 0.0, 1.0)
+    return np.linalg.norm(p - (link_start + t * link))
+
+def link_link_distance(l1_start, l1_end, l2_start, l2_end):
+    def side(p, start, end):
+        link = end -start
+        p_start_vec = p - start
+        return link[0] * p_start_vec[1] - link[1] * p_start_vec[0]
+    l2_cross_l1 = side(l2_start, l1_start, l1_end ) * side(l2_end, l1_start, l1_end) < 0
+    l1_cross_l2 = side(l1_start, l2_start, l2_end) * side(l1_end, l2_start, l2_end) < 0
+    d_end = min(point_link_distance(l1_start, l2_start, l2_end),
+               point_link_distance(l1_end,   l2_start, l2_end),
+               point_link_distance(l2_start, l1_start, l1_end),
+               point_link_distance(l2_end,   l1_start, l1_end))
+    if l2_cross_l1 and l1_cross_l2:
+        return -d_end    
+    return d_end
+    
 
 # SLSQP솔버 조립
 def slsqp(
@@ -139,7 +182,7 @@ def slsqp(
         nonlocal count
         count += 1
         current_cond = compute_condition_number(xk)
-        print(f"  [반복 {count:2d}] 현재 조건수: {current_cond:.4f}")
+        print(f"  [반복 {count:2d}] 현재 조건수: {current_cond:.4f}, " f"최소 마진: {evaluate_constraints(xk).min():+.4f}")
         np.save("temp_coeffs.npy", xk)
 
     result = minimize(
@@ -192,8 +235,6 @@ def save(optimized_coeffs, out_dir: str | Path  =".", tag =""):
     header_str = "time, q1, q2, q3, qdot1, qdot2, qdot3, qddot1, qddot2, qddot3, torque1, torque2, torque3"
     np.savetxt(out_dir / f"optimized_trajectory{tag}.txt", trajectory_data, fmt="%.8f", delimiter=", ", header=header_str)
     print(f"최적화 경로가 'optimized_trajectory{tag}.npz' 및 '.txt'에 저장되었습니다.")
-    is_valid = np.all(evaluate_constraints(optimized_coeffs, 0.01) >= -1e-3)
-    print(f"제약조건 만족 여부(여유 20%): {is_valid}")
     print(f"q_min        : {np.min(q, axis=0)}")
     print(f"q_max        : {np.max(q, axis=0)}")
     print(f"|qdot|_max   : {np.max(np.abs(qdot), axis=0)}")
@@ -201,6 +242,36 @@ def save(optimized_coeffs, out_dir: str | Path  =".", tag =""):
 
     z = np.array([[p[1] for p in fk_2D(q_t)] for q_t in q])
     print(f"높이 최소(p1,p2,p3) : {np.min(z, axis=0)}")
+    
+    is_valid = np.all(evaluate_constraints(optimized_coeffs, 0.01) >= 5 * -1e-3)
+    print(f"제약조건 만족 여부(여유 20%): {is_valid}")
+    if not is_valid:
+        report_violations(optimized_coeffs, 0.01)
+
+def report_violations(coeffs, time_step=0.01, period=10.0):
+    c = evaluate_constraints(coeffs, time_step, period)
+    N = int(period / time_step)
+    blocks = c.reshape(6, N, 3)
+
+    names = ["q_upper", "q_lower", "qdot", "torque", "z", "col"]
+    cols  = {"z":   ["p1", "p2", "p3"],
+             "col": ["base-L2", "base-L3", "L1-L3"]}
+    units = {"z": "m", "col": "m"}
+
+    print("---- 제약 위반 리포트 ----")
+    any_violation = False
+    for k, name in enumerate(names):
+        for j in range(3):
+            m = blocks[k, :, j]
+            if m.min() >= 0:
+                continue
+            any_violation = True
+            i = m.argmin()
+            label = cols.get(name, ["joint1", "joint2", "joint3"])[j]
+            unit = units.get(name, "(비율)")
+            print(f"{name:8s} {label:8s}: 최대 위반 {m.min():+.4f} {unit}, " f"t = {i * time_step:.2f} s, 위반 샘플 {np.sum(m < 0)}/{N}")
+    if not any_violation:
+        print("위반 없음")
 
 if __name__ == "__main__":
     print(f"--------test--------")

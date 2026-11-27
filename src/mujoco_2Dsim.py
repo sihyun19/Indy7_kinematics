@@ -1,25 +1,18 @@
 import mujoco
 import numpy as np
-from Indy7_2D3DOF import INDY7_2D_JOINTS as J
 import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 TRAJ_DIR = Path(__file__).resolve().parent.parent / "data" / "trajectories"
-SIM_DIR = Path(__file__).resolve().parent.parent / "data" / "sim"
+RESULT_DIR = Path(__file__).resolve().parent.parent / "data" / "results"
 from config.indy7_dimensions import TCP_OFFSET
 TCP_POS = np.array([0,0,TCP_OFFSET])
 
-def build_model(
-        #TCP의 페이로드 관련 정보 추가 입력
-        pos: np.ndarray | None = np.array([0.0, 0.0, 0.0]), 
-        mass : float | None = None,
-        ipos : np.ndarray | None = np.array([0.02, 0.0, 0.04]),
-        inertia : np.ndarray | None = np.array([0.015, 0.015, 0.015])
-):
+def build_model(payload: dict | None = None):
     spec = mujoco.MjSpec.from_file(str(Path(__file__).resolve().parent.parent/"model"/"indy7.urdf" ))
     spec.compiler.fusestatic = False
-    if mass is not None:
-        spec.body("tcp").add_body(name="payload", pos=pos, mass=mass, ipos= ipos, inertia=inertia)
+    if payload is not None:
+        spec.body("tcp").add_body(name="payload", **payload)
         #ipos = [-cy, 0, cx]
     model = spec.compile()
     model.dof_damping[:] = 0
@@ -37,6 +30,7 @@ def simulate_dynamics(
     idx = [1, 2, 4]
     N = len(q)
     torque = np.zeros((N, 3))
+    contact_idx = []
     for i in range(N):
         data.qpos[idx] = q[i]
         data.qvel[idx] = qdot[i]
@@ -56,15 +50,26 @@ def comvert_form(pos, mass, ipos, inertia):
     Io = inertia[1] + mass*( cx**2 + cy**2 )
     return mass, cx, cy, Io
 
-    
-    
-if __name__ == "__main__":
-    m_loaded = build_model(mass=2.5)
-    m_free = build_model()
-    print("payload mass:",m_loaded.body("payload").mass)
-    print("diff of total mass:", m_loaded.body_mass.sum() - m_free.body_mass.sum())
+def run_sim(traj_id: int, payload: dict | None = None):
+    traj = np.load(TRAJ_DIR / f"optimized_trajectory_{traj_id:03d}.npz")
+    model = build_model(payload)
+    torque = simulate_dynamics(model, traj["q"], traj["qdot"], traj["qddot"])
+    out_dir = RESULT_DIR / f"trajectory_{traj_id:03d}"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    tag = "unloaded" if payload is None else "loaded"
+    out = out_dir / f"sim_{tag}.npz"
+    sim_data = dict(time=traj["time"], q=traj["q"], qdot=traj["qdot"], qddot=traj["qddot"], torque=torque)
+    if payload is not None:
+        sim_data["true_params"] = np.array(comvert_form(**payload))
+    np.savez(out, **sim_data)
+    print(f"저장: {out}  |torque|_max: {np.abs(torque).max(axis=0)}")
+    return torque
 
-    q = np.array([[0.0, 0.0, 0.0], [0.3, -0.5, 0.2]])
-    z = np.zeros_like(q)
-    print(simulate_dynamics(m_loaded, q, z, z) - simulate_dynamics(m_free, q, z, z))
+if __name__ == "__main__":
+    traj_id = int(sys.argv[1])
+    TEST_PAYLOAD = dict(pos=np.array([0.0, 0.0, 0.0]), mass=2.5,
+                        ipos=np.array([0.02, 0.0, 0.04]),
+                        inertia=np.array([0.015, 0.015, 0.015]))
+    run_sim(traj_id)
+    run_sim(traj_id, TEST_PAYLOAD)
     
