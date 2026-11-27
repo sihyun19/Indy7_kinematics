@@ -140,27 +140,28 @@ def collision(
     p1, p2, p3 = fk_2D(q)
     T = np.array([-np.sin(np.sum(q)), np.cos(np.sum(q))])
     p_pay = p3 + (L_PAYLOAD / 2) * T
-    d0 = link_link_distance(base, p0, p1, p2)
-    d1 = link_link_distance(base, p0, p2, p3)
-    d2 = link_link_distance(p0, p1, p2, p3)
-    d3 = point_link_distance(p_pay, base, p0)
-    d4 = point_link_distance(p_pay, p0, p1)
-    d5 = point_link_distance(p_pay, p1, p2)
+    d0_square = link_link_distance(base, p0, p1, p2)
+    d1_square = link_link_distance(base, p0, p2, p3)
+    d2_square = link_link_distance(p0, p1, p2, p3)
+    d3_square = point_link_distance(p_pay, base, p0)
+    d4_square = point_link_distance(p_pay, p0, p1)
+    d5_square = point_link_distance(p_pay, p1, p2)
 
     
     CLEARANCE = 0.02
     R1, R2, R3 = (j.R for j in INDY7_2D_JOINTS)
-    return np.array([d0 - (R_BASE_2D + R2 + CLEARANCE),
-                     d1 - (R_BASE_2D + R3 + CLEARANCE),
-                     d2 - (R1 + R3 + CLEARANCE),
-                     d3 - (R_PAYLOAD + R_BASE_2D + CLEARANCE),
-                     d4 - (R_PAYLOAD + R1 + CLEARANCE),
-                     d5 - (R_PAYLOAD + R2 + CLEARANCE)])
+    return np.array([(d0_square - (R_BASE_2D + R2 + CLEARANCE)**2)/(R_BASE_2D + R2 + CLEARANCE)**2,
+                     (d1_square - (R_BASE_2D + R3 + CLEARANCE)**2)/(R_BASE_2D + R3 + CLEARANCE)**2,
+                     (d2_square - (R1 + R3 + CLEARANCE)**2)/(R1 + R3 + CLEARANCE)**2,
+                     (d3_square - (R_PAYLOAD + R_BASE_2D + CLEARANCE)**2)/(R_PAYLOAD + R_BASE_2D + CLEARANCE)**2,
+                     (d4_square - (R_PAYLOAD + R1 + CLEARANCE)**2)/(R_PAYLOAD + R1 + CLEARANCE)**2,
+                     (d5_square - (R_PAYLOAD + R2 + CLEARANCE)**2)/(R_PAYLOAD + R2 + CLEARANCE)**2])
 
 def point_link_distance(p, link_start, link_end):
     link = link_end - link_start
     t = np.clip(np.dot(p - link_start, link) / np.dot(link, link), 0.0, 1.0)
-    return np.linalg.norm(p - (link_start + t * link))
+    diff = p - (link_start + t * link)
+    return float(np.dot(diff, diff))
 
 def link_link_distance(l1_start, l1_end, l2_start, l2_end):
     def side(p, start, end):
@@ -169,13 +170,13 @@ def link_link_distance(l1_start, l1_end, l2_start, l2_end):
         return link[0] * p_start_vec[1] - link[1] * p_start_vec[0]
     l2_cross_l1 = side(l2_start, l1_start, l1_end ) * side(l2_end, l1_start, l1_end) < 0
     l1_cross_l2 = side(l1_start, l2_start, l2_end) * side(l1_end, l2_start, l2_end) < 0
-    d_end = min(point_link_distance(l1_start, l2_start, l2_end),
+    d_end_square = min(point_link_distance(l1_start, l2_start, l2_end),
                point_link_distance(l1_end,   l2_start, l2_end),
                point_link_distance(l2_start, l1_start, l1_end),
                point_link_distance(l2_end,   l1_start, l1_end))
     if l2_cross_l1 and l1_cross_l2:
-        return -d_end    
-    return d_end
+        return -d_end_square
+    return d_end_square
     
 
 # SLSQP솔버 조립
@@ -273,16 +274,8 @@ def report_violations(coeffs, time_step=0.01, period=10.0):
         ("qdot",    ["joint2", "joint3", "joint5"], "(비율)"),
         ("torque",  ["joint2", "joint3", "joint5"], "(비율)"),
         ("z",       ["p1", "p2", "p3", "pay"],      "m"),
-        ("col",     ["base-L2", "base-L3", "L1-L3", "pay-base", "pay-L1", "pay-L2"], "m"),
+        ("col",     ["base-L2", "base-L3", "L1-L3", "pay-base", "pay-L1", "pay-L2"], "비율"),
     ]
-    offset = 0
-    for name, labels, unit in specs:
-        k = len(labels)
-        block = c[offset : offset + N * k].reshape(N, k)
-        offset += N * k
-        for j, label in enumerate(labels):
-            m = block[:, j]
-
         print("---- 제약 위반 리포트 ----")
     any_violation = False
     offset = 0
