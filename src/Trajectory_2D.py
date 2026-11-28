@@ -96,11 +96,11 @@ def compute_condition_number(
     cond_Y_all = sigmas[-1] / sigmas[0]
     return float(cond_Y_all)
 
-# 제약조건, 다운샘플링 후 *200 벡터  출력
+# 제약조건, 다운샘플링 후 *300 벡터  출력
 def evaluate_constraints(
     fourier_coeffs_21: np.ndarray,
     time_step: float = 0.05,
-    period: float = 10.0,
+    period: float = 15.0,
 ) -> np.ndarray:
   
     _, q, qdot, qddot = trajectory_evaluator(fourier_coeffs_21, time_step, period)
@@ -108,7 +108,7 @@ def evaluate_constraints(
 
     q_max = np.array([0.8*j.q_max for j in INDY7_2D_JOINTS])
     q_min = np.array([0.8*j.q_min for j in INDY7_2D_JOINTS])
-    qdot_max = np.array([0.4*j.qdot_max for j in INDY7_2D_JOINTS])
+    qdot_max = np.array([0.25*j.qdot_max for j in INDY7_2D_JOINTS])
     torque_max = np.array([0.8*j.effort for j in INDY7_2D_JOINTS])
 
     margin_q_upper = ((q_max - q) / q_max).flatten()

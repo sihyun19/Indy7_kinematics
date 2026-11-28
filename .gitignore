@@ -9,10 +9,8 @@ data/raw_matlab/*.mat
 .venv/
 .council/
 temp_coeffs.npy
-optimized_coeffs.npy
-optimized_coeffs.txt
-optimized_trajectory.npz
-optimized_trajectory.txt
-data/trajectories/*.npz
-data/trajectories/*.txt
 model/*.f3z
+data/trajectories/optimized_trajectory_*.npz
+data/trajectories/optimized_trajectory_*.txt
+data/results/
+.ruff_cache/
