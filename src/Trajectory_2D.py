@@ -108,7 +108,7 @@ def evaluate_constraints(
 
     q_max = np.array([0.8*j.q_max for j in INDY7_2D_JOINTS])
     q_min = np.array([0.8*j.q_min for j in INDY7_2D_JOINTS])
-    qdot_max = np.array([0.8*j.qdot_max for j in INDY7_2D_JOINTS])
+    qdot_max = np.array([0.4*j.qdot_max for j in INDY7_2D_JOINTS])
     torque_max = np.array([0.8*j.effort for j in INDY7_2D_JOINTS])
 
     margin_q_upper = ((q_max - q) / q_max).flatten()
