@@ -8,10 +8,16 @@ from scipy.optimize import minimize
 import csv, re, datetime
 from pathlib import Path
 
-L_PAYLOAD = 0.20  
-W_PAYLOAD = 0.20
-R_PAYLOAD = float(np.hypot(L_PAYLOAD / 2, W_PAYLOAD / 2))
-MAX_PAYLOAD = np.array([5.0, 0.10, 0.0, 0.085])
+# 실측 외곽 390mm(폭) × 296mm(높이) 기준 3-원 근사 (대칭 보수 반경 r=0.075m)
+PAYLOAD_CIRCLES = [
+    (0.245,  0.000, 0.075),  # 1) 상단 추 (축방향 최대 0.320m 커버 ≥ 0.296m)
+    (0.165,  0.155, 0.075),  # 2) 우측 추 (횡방향 최대 +0.230m 커버)
+    (0.165, -0.155, 0.075),  # 3) 좌측 끝단 (장착 방향 무관 보수 반경)
+]
+
+# 실측치 [4.4902, 0.1691, -0.0555, 0.2031]에 안전 여유 5%를 둔 상한
+MAX_PAYLOAD1 = np.array([4.6, 0.175, -0.060, 0.215])
+MAX_PAYLOAD2 = np.array([4.6, 0.175, 0.060, 0.215])
 
 # 푸리에 계수에 따른 q, qdot, qddot 행렬 생성
 def trajectory_evaluator(
@@ -90,10 +96,10 @@ def compute_condition_number(
     cond_Y_all = sigmas[-1] / sigmas[0]
     return float(cond_Y_all)
 
-# 제약조건, 다운샘플링 후 12*100=1200 벡터  출력
+# 제약조건, 다운샘플링 후 *200 벡터  출력
 def evaluate_constraints(
     fourier_coeffs_21: np.ndarray,
-    time_step: float = 0.1,
+    time_step: float = 0.05,
     period: float = 10.0,
 ) -> np.ndarray:
   
@@ -111,7 +117,9 @@ def evaluate_constraints(
     torque_all =   np.zeros((N, 3))
     for i in range(N):
         tau_free = compute_torque(q[i], qdot[i], qddot[i])
-        tau_max  = compute_torque(q[i], qdot[i], qddot[i], MAX_PAYLOAD)
+        tau_max_1  = compute_torque(q[i], qdot[i], qddot[i], MAX_PAYLOAD1)
+        tau_max_2  = compute_torque(q[i], qdot[i], qddot[i], MAX_PAYLOAD2)
+        tau_max = np.maximum(np.abs(tau_max_1), np.abs(tau_max_2))
         torque_all[i, :] = np.maximum(np.abs(tau_free), np.abs(tau_max))
     margin_torque  = ((torque_max - np.abs(torque_all)) / torque_max).flatten()
 
@@ -120,7 +128,9 @@ def evaluate_constraints(
     margin_z = []
     for i in range(N):
         p1, p2, p3 = fk_2D(q[i])
-        margin_z.extend([p1[1], p2[1], p3[1], p3[1] + (L_PAYLOAD / 2) * np.cos(np.sum(q[i]))- R_PAYLOAD])
+        phi = np.sum(q[i])
+        z_payload = [p3[1] + t_off * np.cos(phi) - n_off * np.sin(phi) - r for t_off, n_off, r in PAYLOAD_CIRCLES]
+        margin_z.extend([p1[1], p2[1], p3[1], *z_payload])
     margin_z = (np.array(margin_z) - z_min)
 
     #충돌 마진
@@ -138,24 +148,32 @@ def collision(
     base = np.array([0.0, 0.0])
     p0= np.array([0.0, INDY7_2D_JOINTS[0].len_val])
     p1, p2, p3 = fk_2D(q)
-    T = np.array([-np.sin(np.sum(q)), np.cos(np.sum(q))])
-    p_pay = p3 + (L_PAYLOAD / 2) * T
-    d0_square = link_link_distance(base, p0, p1, p2)
-    d1_square = link_link_distance(base, p0, p2, p3)
-    d2_square = link_link_distance(p0, p1, p2, p3)
-    d3_square = point_link_distance(p_pay, base, p0)
-    d4_square = point_link_distance(p_pay, p0, p1)
-    d5_square = point_link_distance(p_pay, p1, p2)
-
-    
+    phi = np.sum(q)
     CLEARANCE = 0.02
     R1, R2, R3 = (j.R for j in INDY7_2D_JOINTS)
-    return np.array([(d0_square - (R_BASE_2D + R2 + CLEARANCE)**2)/(R_BASE_2D + R2 + CLEARANCE)**2,
-                     (d1_square - (R_BASE_2D + R3 + CLEARANCE)**2)/(R_BASE_2D + R3 + CLEARANCE)**2,
-                     (d2_square - (R1 + R3 + CLEARANCE)**2)/(R1 + R3 + CLEARANCE)**2,
-                     (d3_square - (R_PAYLOAD + R_BASE_2D + CLEARANCE)**2)/(R_PAYLOAD + R_BASE_2D + CLEARANCE)**2,
-                     (d4_square - (R_PAYLOAD + R1 + CLEARANCE)**2)/(R_PAYLOAD + R1 + CLEARANCE)**2,
-                     (d5_square - (R_PAYLOAD + R2 + CLEARANCE)**2)/(R_PAYLOAD + R2 + CLEARANCE)**2])
+    #링크간 충돌
+    d0_sq = link_link_distance(base, p0, p1, p2)
+    d1_sq = link_link_distance(base, p0, p2, p3)
+    d2_sq = link_link_distance(p0, p1, p2, p3)
+    margins = [
+        (d0_sq - (R_BASE_2D + R2 + CLEARANCE)**2) / (R_BASE_2D + R2 + CLEARANCE)**2,
+        (d1_sq - (R_BASE_2D + R3 + CLEARANCE)**2) / (R_BASE_2D + R3 + CLEARANCE)**2,
+        (d2_sq - (R1 + R3 + CLEARANCE)**2)        / (R1 + R3 + CLEARANCE)**2,
+    ]
+    #링크-페이로드 충돌
+    links = [(base, p0, R_BASE_2D), (p0, p1, R1), (p1, p2, R2)]
+    for t_off, n_off, r in PAYLOAD_CIRCLES:
+        p_pay = np.array([
+            p3[0] - t_off * np.sin(phi) - n_off * np.cos(phi),
+            p3[1] + t_off * np.cos(phi) - n_off * np.sin(phi),
+        ])
+        for link_start, link_end, r_link in links:
+            d_sq = point_link_distance(p_pay, link_start, link_end)
+            d_req_sq = (r + r_link + CLEARANCE) ** 2
+            margins.append((d_sq - d_req_sq) / d_req_sq)
+
+    
+    return np.array(margins)
 
 def point_link_distance(p, link_start, link_end):
     link = link_end - link_start
@@ -270,17 +288,17 @@ def report_violations(coeffs, time_step=0.01, period=10.0):
     c = evaluate_constraints(coeffs, time_step, period)
     N = int(period / time_step)
     specs = [
-        ("q_upper", ["joint2", "joint3", "joint5"], "(비율)"),
-        ("q_lower", ["joint2", "joint3", "joint5"], "(비율)"),
-        ("qdot",    ["joint2", "joint3", "joint5"], "(비율)"),
-        ("torque",  ["joint2", "joint3", "joint5"], "(비율)"),
-        ("z",       ["p1", "p2", "p3", "pay"],      "m"),
-        ("col",     ["base-L2", "base-L3", "L1-L3", "pay-base", "pay-L1", "pay-L2"], "비율"),
+        ("q_upper", ["joint2", "joint3", "joint5"], "%", 100),
+        ("q_lower", ["joint2", "joint3", "joint5"], "%", 100),
+        ("qdot",    ["joint2", "joint3", "joint5"], "%", 100),
+        ("torque",  ["joint2", "joint3", "joint5"], "%", 100),
+        ("z",       ["p1", "p2", "p3", "pay_top", "pay_R", "pay_L"], "m", 1),
+        ("col",     ["base-L2", "base-L3", "L1-L3", "top-base", "top-L1", "top-L2", "R-base", "R-L1", "R-L2", "L-base", "L-L1", "L-L2"], "%", 100),
     ]
     print("---- 제약 위반 리포트 ----")
     any_violation = False
     offset = 0
-    for name, labels, unit in specs:
+    for name, labels, unit, scale in specs:
         k = len(labels)
         block = c[offset : offset + N * k].reshape(N, k)
         offset += N * k
@@ -290,7 +308,7 @@ def report_violations(coeffs, time_step=0.01, period=10.0):
                 continue
             any_violation = True
             i = m.argmin()
-            print(f"{name:8s} {label:8s}: 최대 위반 {m.min():+.4f} {unit}, " f"t = {i * time_step:.2f} s, 위반 샘플 {np.sum(m < 0)}/{N}")
+            print(f"{name:8s} {label:8s}: 최대 위반 {m.min() * scale:+.2f} {unit}, " f"t = {i * time_step:.2f} s, 위반 샘플 {np.sum(m < 0)}/{N}")
     if not any_violation:
         print("위반 없음")
 
