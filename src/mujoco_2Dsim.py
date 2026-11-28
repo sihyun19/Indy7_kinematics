@@ -10,10 +10,20 @@ TCP_POS = np.array([0,0,TCP_OFFSET])
 
 def build_model(payload: dict | None = None):
     spec = mujoco.MjSpec.from_file(str(Path(__file__).resolve().parent.parent/"model"/"indy7.urdf" ))
-    spec.compiler.fusestatic = False
+    spec.compiler.fusestatic = False 
+    #페이로드 장착. 시각화용 메시 
     if payload is not None:
-        spec.body("tcp").add_body(name="payload", **payload)
-        #ipos = [-cy, 0, cx]
+        spec.add_mesh(
+            name="payload_mesh",
+            file=str(Path(__file__).resolve().parent.parent / "model" / "meshes" / "payload.stl"),
+            scale=[1, 1, 1],  
+        )
+        pay_body = spec.body("tcp").add_body(name="payload", **payload)
+        pay_body.add_geom(
+            type=mujoco.mjtGeom.mjGEOM_MESH,
+            meshname="payload_mesh",
+            contype=0, mass=0.0, conaffinity=0, 
+        )
     model = spec.compile()
     model.dof_damping[:] = 0
     model.dof_frictionloss[:] = 0
@@ -65,9 +75,12 @@ def run_sim(traj_id: int, payload: dict | None = None):
 
 if __name__ == "__main__":
     traj_id = int(sys.argv[1])
-    TEST_PAYLOAD = dict(pos=np.array([0.0, 0.0, 0.0]), mass=2.5,
-                        ipos=np.array([0.02, 0.0, 0.04]),
-                        inertia=np.array([0.015, 0.015, 0.015]))
+    REAL_PAYLOAD = dict(
+        pos=np.array([0.0, 0.0, 0.0]),
+        mass=4.490237,
+        ipos=np.array([0.055465, -0.005954, 0.169077]),
+        inertia=np.array([0.02772, 0.06096, 0.03455]),
+    )
     run_sim(traj_id)
-    run_sim(traj_id, TEST_PAYLOAD)
+    run_sim(traj_id, REAL_PAYLOAD)
     
